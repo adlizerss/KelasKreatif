@@ -1,0 +1,5 @@
+{
+  "name": "Kelas Kreatif - Alat Bantu Guru",
+  "description": "Aplikasi komprehensif untuk guru membagi kelompok siswa secara acak dengan fitur input fleksibel (manual/excel) dan ekspor hasil (Word/Txt).",
+  "requestFramePermissions": []
+}
