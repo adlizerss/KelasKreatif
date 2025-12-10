@@ -1,11 +1,62 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Disc, Award, Sun, Moon } from 'lucide-react';
+import { Users, Disc, Award, Sun, Moon, Clock, Map } from 'lucide-react';
 import GroupGenerator from './components/GroupGenerator';
 import SpinWheel from './components/SpinWheel';
 import CertificateGenerator from './components/CertificateGenerator';
+import TimeKeeper from './components/TimeKeeper';
+import QuestBoardGenerator from './components/QuestBoardGenerator';
 
-type AppMode = 'grouper' | 'wheel' | 'certificate';
+type AppMode = 'grouper' | 'wheel' | 'certificate' | 'timekeeper' | 'quest';
 type Theme = 'light' | 'dark';
+
+// Definisi Gaya Tema untuk Header
+const THEME_STYLES: Record<AppMode, { gradient: string; text: string; icon: React.ElementType }> = {
+  grouper: { 
+    gradient: 'from-indigo-600 to-blue-600', 
+    text: 'text-indigo-600',
+    icon: Users 
+  },
+  wheel: { 
+    gradient: 'from-pink-500 to-rose-500', 
+    text: 'text-pink-600',
+    icon: Disc 
+  },
+  certificate: { 
+    gradient: 'from-emerald-500 to-teal-600', 
+    text: 'text-emerald-600',
+    icon: Award 
+  },
+  timekeeper: { 
+    gradient: 'from-orange-500 to-amber-500', 
+    text: 'text-orange-600',
+    icon: Clock 
+  },
+  quest: { 
+    gradient: 'from-purple-600 to-violet-600', 
+    text: 'text-purple-600',
+    icon: Map 
+  },
+};
+
+// Custom Logo Component based on User Sketch
+const CustomLogo = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    {/* Kiri Atas - Oren */}
+    <rect x="3.5" y="4.5" width="3" height="8" rx="1.5" transform="rotate(-45 5 8.5)" fill="#f97316" />
+    
+    {/* Kanan Atas - Merah */}
+    <rect x="17.5" y="4.5" width="3" height="8" rx="1.5" transform="rotate(45 19 8.5)" fill="#ef4444" />
+    
+    {/* Kiri Bawah - Ungu */}
+    <rect x="3.5" y="11.5" width="3" height="8" rx="1.5" transform="rotate(45 5 15.5)" fill="#a855f7" />
+    
+    {/* Kanan Bawah - Hijau */}
+    <rect x="17.5" y="11.5" width="3" height="8" rx="1.5" transform="rotate(-45 19 15.5)" fill="#22c55e" />
+
+    {/* Tengah - Biru (Digambar terakhir agar di layer paling atas) */}
+    <rect x="10" y="3" width="4" height="18" rx="2" fill="#3b82f6" stroke="white" strokeWidth="1.5" />
+  </svg>
+);
 
 function App() {
   const [mode, setMode] = useState<AppMode>('grouper');
@@ -31,76 +82,80 @@ function App() {
     document.documentElement.classList.toggle('dark', newTheme === 'dark');
   };
 
+  const navItems = [
+    { id: 'grouper', label: 'Kelompok', icon: Users, themeText: 'text-indigo-600' },
+    { id: 'wheel', label: 'Roda', icon: Disc, themeText: 'text-pink-600' },
+    { id: 'certificate', label: 'Sertifikat', icon: Award, themeText: 'text-emerald-600' },
+    { id: 'timekeeper', label: 'Waktu', icon: Clock, themeText: 'text-orange-600' },
+    { id: 'quest', label: 'Misi', icon: Map, themeText: 'text-purple-600' },
+  ];
+
+  const currentTheme = THEME_STYLES[mode];
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20 font-sans transition-colors duration-300">
-      {/* Header */}
-      <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-30 shadow-sm transition-colors duration-300">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-lg text-white transition-colors duration-300 ${
-              mode === 'grouper' ? 'bg-indigo-600' : 
-              mode === 'wheel' ? 'bg-pink-600' : 'bg-emerald-600'
-            }`}>
-              {mode === 'grouper' ? <Users className="w-5 h-5" /> : 
-               mode === 'wheel' ? <Disc className="w-5 h-5 spin-slow" /> :
-               <Award className="w-5 h-5" />}
-            </div>
-            <h1 className="text-xl font-bold text-slate-800 dark:text-slate-100 tracking-tight hidden sm:block">
-              KelasKreatif <span className="font-normal text-slate-400">|</span> <span className="text-slate-600 dark:text-slate-400 font-medium">
-                {mode === 'grouper' ? 'Pengacak Kelompok' : 
-                 mode === 'wheel' ? 'Spin Wheel' : 'Sertifikat'}
-              </span>
-            </h1>
-            <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100 tracking-tight sm:hidden">
-              KelasKreatif
-            </h1>
-          </div>
+      {/* Header dengan Dynamic Gradient */}
+      <header 
+        className={`bg-gradient-to-r ${currentTheme.gradient} sticky top-0 z-30 shadow-lg transition-all duration-500 ease-in-out`}
+      >
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between pt-3 pb-3 sm:py-0 sm:h-16 gap-3 sm:gap-0">
           
-          <div className="flex items-center gap-2 sm:gap-4">
-            <nav className="flex gap-1 sm:gap-2">
-              <button
-                onClick={() => setMode('grouper')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-all ${
-                  mode === 'grouper' 
-                    ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-slate-900' 
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title="Bagi Kelompok"
-              >
-                <Users className="w-4 h-4" />
-                <span className="hidden md:inline">Kelompok</span>
-              </button>
-              <button
-                onClick={() => setMode('wheel')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-all ${
-                  mode === 'wheel' 
-                    ? 'bg-pink-50 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 ring-2 ring-pink-500 ring-offset-2 dark:ring-offset-slate-900' 
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title="Spin Wheel"
-              >
-                <Disc className="w-4 h-4" />
-                <span className="hidden md:inline">Wheel</span>
-              </button>
-              <button
-                onClick={() => setMode('certificate')}
-                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-medium transition-all ${
-                  mode === 'certificate' 
-                    ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 ring-2 ring-emerald-500 ring-offset-2 dark:ring-offset-slate-900' 
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                }`}
-                title="Sertifikat"
-              >
-                <Award className="w-4 h-4" />
-                <span className="hidden md:inline">Sertifikat</span>
-              </button>
-            </nav>
+          {/* Top Row on Mobile: Logo + Theme Toggle */}
+          <div className="flex items-center justify-between w-full sm:w-auto">
+            {/* Logo Section */}
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 rounded-lg bg-white shadow-sm transition-transform duration-300 transform hover:scale-105">
+                 <CustomLogo className="w-6 h-6" />
+              </div>
+              <h1 className="text-xl font-bold text-white tracking-tight drop-shadow-md">
+                KromaKeys <span className="font-normal text-white/60 hidden sm:inline">|</span> <span className="text-white/90 font-medium text-sm sm:text-base hidden sm:inline">
+                  {navItems.find(i => i.id === mode)?.label}
+                </span>
+              </h1>
+            </div>
 
-            <div className="w-px h-6 bg-slate-300 dark:bg-slate-700 mx-1 hidden sm:block"></div>
-
+            {/* Mobile Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="p-2 rounded-full text-white/80 hover:bg-white/20 transition-colors sm:hidden"
+              title={theme === 'light' ? 'Aktifkan Mode Gelap' : 'Aktifkan Mode Terang'}
+            >
+              {theme === 'light' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
+            </button>
+          </div>
+          
+          {/* Navigation Section */}
+          <div className="flex items-center w-full sm:w-auto">
+            {/* Mobile: Grid 5 Columns. Desktop: Flex Row */}
+            <nav className="grid grid-cols-5 gap-2 w-full sm:flex sm:gap-2 sm:w-auto">
+              {navItems.map((item) => {
+                 const isActive = mode === item.id;
+                 const Icon = item.icon;
+                 
+                 return (
+                   <button
+                    key={item.id}
+                    onClick={() => setMode(item.id as AppMode)}
+                    className={`flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 p-2 sm:px-3 sm:py-2 rounded-xl sm:rounded-full text-sm font-medium transition-all duration-300 ${
+                      isActive 
+                        ? `bg-white ${item.themeText} shadow-md scale-105` 
+                        : 'text-white/70 hover:bg-white/20 hover:text-white'
+                    }`}
+                    title={item.label}
+                  >
+                    <Icon className={`w-6 h-6 sm:w-4 sm:h-4 ${isActive && item.id === 'wheel' ? 'spin-slow' : ''}`} />
+                    <span className="text-[10px] sm:text-sm sm:inline font-bold sm:font-medium hidden xs:inline">{item.label}</span>
+                  </button>
+                 );
+              })}
+            </nav>
+
+            <div className="w-px h-6 bg-white/20 mx-3 hidden sm:block"></div>
+
+            {/* Desktop Theme Toggle */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full text-white/80 hover:bg-white/20 transition-colors hidden sm:block"
               title={theme === 'light' ? 'Aktifkan Mode Gelap' : 'Aktifkan Mode Terang'}
             >
               {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
@@ -112,7 +167,9 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 transition-colors duration-300">
         {mode === 'grouper' ? <GroupGenerator /> : 
          mode === 'wheel' ? <SpinWheel /> : 
-         <CertificateGenerator />}
+         mode === 'certificate' ? <CertificateGenerator /> :
+         mode === 'timekeeper' ? <TimeKeeper /> :
+         <QuestBoardGenerator />}
       </main>
     </div>
   );

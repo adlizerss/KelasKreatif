@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <!-- Kiri Atas - Oren -->
+  <rect x="3.5" y="4.5" width="3" height="8" rx="1.5" transform="rotate(-45 5 8.5)" fill="#f97316" />
+  <!-- Kanan Atas - Merah -->
+  <rect x="17.5" y="4.5" width="3" height="8" rx="1.5" transform="rotate(45 19 8.5)" fill="#ef4444" />
+  <!-- Kiri Bawah - Ungu -->
+  <rect x="3.5" y="11.5" width="3" height="8" rx="1.5" transform="rotate(45 5 15.5)" fill="#a855f7" />
+  <!-- Kanan Bawah - Hijau -->
+  <rect x="17.5" y="11.5" width="3" height="8" rx="1.5" transform="rotate(-45 19 15.5)" fill="#22c55e" />
+  <!-- Tengah - Biru -->
+  <rect x="10" y="3" width="4" height="18" rx="2" fill="#3b82f6" stroke="white" stroke-width="1.5" />
+</svg>

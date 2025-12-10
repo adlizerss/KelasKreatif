@@ -1,23 +1,77 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { CertificateData, BulkCertificateData, CertificateGrade, CertificateThemeColor } from '../types';
 import { AWARD_AREAS, generateCertificateMessage } from '../utils/certificateHelpers';
 import { parseCertificateExcel, generateSampleCertificateExcel } from '../utils/fileParsers';
-import { Award, Crown, Star, ThumbsUp, Download, Printer, Users, FileSpreadsheet, CheckCircle, ChevronLeft, ChevronRight, Package, Palette, Check, Type } from 'lucide-react';
+import { Award, Crown, Star, ThumbsUp, Download, Printer, Users, FileSpreadsheet, CheckCircle, ChevronLeft, ChevronRight, Package, Palette, Check, Type, Sparkles } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
 
-// Mapping Styles for all available colors
-const COLOR_THEMES: Record<CertificateThemeColor, { primary: string; light: string; border: string; text: string; accent: string }> = {
-  emerald: { primary: 'bg-emerald-600', light: 'bg-emerald-50', border: 'border-emerald-600', text: 'text-emerald-900', accent: 'text-emerald-600' },
-  blue:    { primary: 'bg-blue-600',    light: 'bg-blue-50',    border: 'border-blue-600',    text: 'text-blue-900',    accent: 'text-blue-600' },
-  yellow:  { primary: 'bg-yellow-500',  light: 'bg-yellow-50',  border: 'border-yellow-500',  text: 'text-yellow-900',  accent: 'text-yellow-600' },
-  purple:  { primary: 'bg-purple-600',  light: 'bg-purple-50',  border: 'border-purple-600',  text: 'text-purple-900',  accent: 'text-purple-600' },
-  pink:    { primary: 'bg-pink-600',    light: 'bg-pink-50',    border: 'border-pink-600',    text: 'text-pink-900',    accent: 'text-pink-600' },
-  red:     { primary: 'bg-red-600',     light: 'bg-red-50',     border: 'border-red-600',     text: 'text-red-900',     accent: 'text-red-600' },
-  orange:  { primary: 'bg-orange-500',  light: 'bg-orange-50',  border: 'border-orange-500',  text: 'text-orange-900',  accent: 'text-orange-600' },
-  cyan:    { primary: 'bg-cyan-600',    light: 'bg-cyan-50',    border: 'border-cyan-600',    text: 'text-cyan-900',    accent: 'text-cyan-600' },
-  slate:   { primary: 'bg-slate-700',   light: 'bg-slate-100',  border: 'border-slate-700',   text: 'text-slate-900',   accent: 'text-slate-700' },
+// Mapping Styles with Rich Gradients
+const COLOR_THEMES: Record<CertificateThemeColor, { gradient: string; text: string; ring: string; iconBg: string; shadow: string }> = {
+  emerald: { 
+    gradient: 'from-emerald-400 via-emerald-500 to-teal-700', 
+    text: 'text-emerald-700', 
+    ring: 'ring-emerald-100',
+    iconBg: 'bg-emerald-50',
+    shadow: 'shadow-emerald-500/30'
+  },
+  blue: { 
+    gradient: 'from-blue-400 via-indigo-500 to-indigo-700', 
+    text: 'text-indigo-700',
+    ring: 'ring-blue-100',
+    iconBg: 'bg-blue-50',
+    shadow: 'shadow-blue-500/30'
+  },
+  yellow: { 
+    gradient: 'from-yellow-300 via-amber-400 to-orange-600', 
+    text: 'text-amber-700',
+    ring: 'ring-yellow-100',
+    iconBg: 'bg-yellow-50',
+    shadow: 'shadow-amber-500/30'
+  },
+  purple: { 
+    gradient: 'from-fuchsia-400 via-purple-500 to-violet-800', 
+    text: 'text-purple-700',
+    ring: 'ring-purple-100',
+    iconBg: 'bg-purple-50',
+    shadow: 'shadow-purple-500/30'
+  },
+  pink: { 
+    gradient: 'from-pink-400 via-rose-500 to-rose-700', 
+    text: 'text-rose-700',
+    ring: 'ring-pink-100',
+    iconBg: 'bg-pink-50',
+    shadow: 'shadow-pink-500/30'
+  },
+  red: { 
+    gradient: 'from-red-400 via-red-500 to-rose-800', 
+    text: 'text-red-800',
+    ring: 'ring-red-100',
+    iconBg: 'bg-red-50',
+    shadow: 'shadow-red-500/30'
+  },
+  orange: { 
+    gradient: 'from-orange-400 via-orange-500 to-red-600', 
+    text: 'text-orange-800',
+    ring: 'ring-orange-100',
+    iconBg: 'bg-orange-50',
+    shadow: 'shadow-orange-500/30'
+  },
+  cyan: { 
+    gradient: 'from-cyan-400 via-cyan-500 to-blue-700', 
+    text: 'text-cyan-800',
+    ring: 'ring-cyan-100',
+    iconBg: 'bg-cyan-50',
+    shadow: 'shadow-cyan-500/30'
+  },
+  slate: { 
+    gradient: 'from-slate-400 via-slate-600 to-slate-800', 
+    text: 'text-slate-800',
+    ring: 'ring-slate-100',
+    iconBg: 'bg-slate-50',
+    shadow: 'shadow-slate-500/30'
+  },
 };
 
 const CertificateGenerator: React.FC = () => {
@@ -42,9 +96,11 @@ const CertificateGenerator: React.FC = () => {
   const [previewIndex, setPreviewIndex] = useState(0); // Track which student is being previewed
   const [isProcessingBulk, setIsProcessingBulk] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, type: '' });
+  const [previewScale, setPreviewScale] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const certificateRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Auto-update message when dependencies change (Single Mode & Rendering Logic)
@@ -76,6 +132,30 @@ const CertificateGenerator: React.FC = () => {
       }));
     }
   }, [previewIndex, bulkData, mode]);
+
+  // Handle Resize for Certificate Preview
+  useLayoutEffect(() => {
+    const handleResize = () => {
+      if (previewContainerRef.current) {
+        const containerWidth = previewContainerRef.current.offsetWidth;
+        // Padding adjustment (approx 48px padding total)
+        const availableWidth = containerWidth - 48; 
+        
+        // Card width is 400px.
+        // If container is smaller than card, scale down.
+        // If container is larger, keep scale 1 (or allow slight growth if needed, but 1 is crisp)
+        const scale = Math.min(1, availableWidth / 400);
+        setPreviewScale(scale);
+      }
+    };
+    
+    // Initial Call
+    handleResize();
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
 
   const handleChange = (field: keyof CertificateData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));
@@ -133,6 +213,48 @@ const CertificateGenerator: React.FC = () => {
     setPreviewIndex(prev => (prev < bulkData.length - 1 ? prev + 1 : prev));
   };
 
+  // --- EXPORT HELPER (Crucial for Layout Fix) ---
+  const captureHighQuality = async (element: HTMLElement): Promise<string> => {
+    // 1. CLONE: Buat tiruan elemen untuk diexport
+    // Ini penting agar tidak terpengaruh oleh CSS scale/transform di preview
+    const clone = element.cloneNode(true) as HTMLElement;
+
+    // 2. STYLE: Reset transform dan posisikan di luar layar
+    clone.style.transform = 'none';
+    clone.style.margin = '0';
+    clone.style.position = 'fixed';
+    clone.style.top = '-10000px';
+    clone.style.left = '-10000px';
+    clone.style.zIndex = '-9999';
+    // Paksa ukuran agar presisi sesuai desain
+    clone.style.width = '400px'; 
+    clone.style.height = '640px';
+
+    document.body.appendChild(clone);
+
+    try {
+      await document.fonts.ready;
+      // 3. CAPTURE: Foto elemen tiruan
+      const canvas = await html2canvas(clone, { 
+        scale: 4, // Kualitas tinggi (1600x2560 px)
+        useCORS: true,
+        backgroundColor: null,
+        logging: false,
+        width: 400,
+        height: 640,
+        windowWidth: 400,
+        windowHeight: 640
+      });
+      return canvas.toDataURL('image/png', 1.0);
+    } catch (error) {
+      console.error("Capture failed:", error);
+      throw error;
+    } finally {
+      // 4. CLEANUP: Hapus tiruan
+      document.body.removeChild(clone);
+    }
+  };
+
   // --- BULK PROCESSING LOGIC (Reused for PDF and ZIP) ---
   const processBulkItems = async (
     onItemProcessed: (imgData: string, item: BulkCertificateData, index: number) => Promise<void>
@@ -143,8 +265,6 @@ const CertificateGenerator: React.FC = () => {
     const originalIndex = previewIndex;
     
     try {
-      await document.fonts.ready;
-
       // Loop through all students
       for (let i = 0; i < bulkData.length; i++) {
         const item = bulkData[i];
@@ -166,20 +286,12 @@ const CertificateGenerator: React.FC = () => {
         // 2. WAIT for React to Render the DOM
         await new Promise(resolve => setTimeout(resolve, 150));
 
-        // 3. Capture Image
-        const canvas = await html2canvas(certificateRef.current, { 
-          scale: 2, 
-          useCORS: true,
-          backgroundColor: null,
-          width: 400,
-          height: 640,
-          windowWidth: 400,
-          windowHeight: 640,
-        });
-        const imgData = canvas.toDataURL('image/png');
-
-        // 4. Callback to handler (PDF adder or ZIP adder)
-        await onItemProcessed(imgData, item, i);
+        // 3. Capture Image using the Helper
+        if (certificateRef.current) {
+            const imgData = await captureHighQuality(certificateRef.current);
+            // 4. Callback to handler (PDF adder or ZIP adder)
+            await onItemProcessed(imgData, item, i);
+        }
 
         // Update Progress
         setBulkProgress(prev => ({ ...prev, current: i + 1 }));
@@ -267,20 +379,7 @@ const CertificateGenerator: React.FC = () => {
     if (!certificateRef.current) return;
     setIsGenerating(true);
     try {
-      await document.fonts.ready;
-      
-      const canvas = await html2canvas(certificateRef.current, { 
-        scale: 3,
-        useCORS: true,
-        backgroundColor: null,
-        scrollX: 0,
-        scrollY: 0,
-        width: 400,
-        height: 640,
-        windowWidth: 400,
-        windowHeight: 640,
-      }); 
-      const image = canvas.toDataURL("image/png");
+      const image = await captureHighQuality(certificateRef.current);
       const link = document.createElement("a");
       link.href = image;
       link.download = `Kartu-${data.studentName || 'Siswa'}-${data.grade}.png`;
@@ -297,20 +396,7 @@ const CertificateGenerator: React.FC = () => {
     if (!certificateRef.current) return;
     setIsGenerating(true);
     try {
-      await document.fonts.ready;
-
-      const canvas = await html2canvas(certificateRef.current, { 
-        scale: 3,
-        useCORS: true,
-        backgroundColor: null,
-        scrollX: 0,
-        scrollY: 0,
-        width: 400,
-        height: 640,
-        windowWidth: 400,
-        windowHeight: 640,
-      });
-      const imgData = canvas.toDataURL('image/png');
+      const imgData = await captureHighQuality(certificateRef.current);
       
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -333,24 +419,16 @@ const CertificateGenerator: React.FC = () => {
 
   // --- GRADE & THEME LOGIC ---
   const currentGradeConfig = {
-    B: { icon: ThumbsUp, label: 'Good Job!' },
-    A: { icon: Star, label: 'Excellent!' },
-    S: { icon: Crown, label: 'Legendary!' }
+    B: { icon: ThumbsUp, label: 'Certificate of Excellence' },
+    A: { icon: Star, label: 'Certificate of Achievement' },
+    S: { icon: Crown, label: 'Certificate of Mastery' }
   }[data.grade];
 
-  const currentThemeStyles = COLOR_THEMES[data.themeColor];
+  const themeStyle = COLOR_THEMES[data.themeColor];
   const ThemeIcon = currentGradeConfig.icon;
 
   // Constants for fixed layout
-  const HEADER_HEIGHT_PX = 220;
-
-  // Dynamic Font Size for Grade Display (e.g. "Luar Biasa" needs smaller font than "A")
-  const getGradeFontSize = (text: string) => {
-    if (text.length <= 2) return 'text-[140px]'; // For "A", "A+", "10"
-    if (text.length <= 5) return 'text-[80px]';  // For "Baik", "Great"
-    if (text.length <= 10) return 'text-[50px]'; // For "Luar Biasa" (now wraps)
-    return 'text-[45px]'; // For very long text
-  };
+  // Note: We are using a 400x640px base for the card
 
   return (
     <div className="animate-in fade-in duration-500 pb-10">
@@ -450,13 +528,13 @@ const CertificateGenerator: React.FC = () => {
                         placeholder="Contoh: Baik, 100, A+, TOP"
                         className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors"
                       />
-                      <p className="text-[10px] text-slate-400 mt-0.5">Teks ini yang akan tampil besar di pojok kiri atas kartu.</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Teks ini yang akan tampil besar di kartu.</p>
                    </div>
 
                   {/* Color Palette Picker */}
                   <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block mb-2 flex items-center gap-1">
-                      <Palette className="w-3 h-3" /> Tema Warna
+                      <Palette className="w-3 h-3" /> Tema Warna (Gradasi)
                     </label>
                     <div className="flex flex-wrap gap-2">
                        {(Object.keys(COLOR_THEMES) as CertificateThemeColor[]).map((c) => {
@@ -466,10 +544,10 @@ const CertificateGenerator: React.FC = () => {
                            <button
                              key={c}
                              onClick={() => handleColorChange(c)}
-                             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm ${style.primary} ${isSelected ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'hover:scale-105 opacity-80 hover:opacity-100'}`}
+                             className={`w-8 h-8 rounded-full flex items-center justify-center transition-all shadow-sm bg-gradient-to-br ${style.gradient} ${isSelected ? 'ring-2 ring-offset-2 ring-slate-400 scale-110' : 'hover:scale-105 opacity-80 hover:opacity-100'}`}
                              title={c.charAt(0).toUpperCase() + c.slice(1)}
                            >
-                              {isSelected && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
+                              {isSelected && <Check className="w-4 h-4 text-white drop-shadow-md" strokeWidth={3} />}
                            </button>
                          )
                        })}
@@ -689,7 +767,10 @@ const CertificateGenerator: React.FC = () => {
 
         {/* RIGHT COLUMN: Preview */}
         <div className="lg:col-span-7 flex justify-center pb-8">
-           <div className="bg-slate-200/50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-xl border border-slate-200 dark:border-slate-800 w-full flex flex-col items-center min-h-[500px] sm:min-h-[700px] overflow-hidden transition-colors">
+           <div 
+              ref={previewContainerRef}
+              className="bg-slate-200/50 dark:bg-slate-900/50 p-4 sm:p-6 rounded-xl border border-slate-200 dark:border-slate-800 w-full flex flex-col items-center min-h-[500px] sm:min-h-[700px] overflow-hidden transition-colors"
+           >
               
               {/* Preview Label & Pagination */}
               <div className="w-full flex items-center justify-between mb-4 px-2 sm:px-4 max-w-[400px]">
@@ -722,109 +803,92 @@ const CertificateGenerator: React.FC = () => {
 
               {/* === MASTER LAYOUT START === */}
               {/* Responsive Container: Scale down on mobile, full size on larger screens */}
-              <div className="relative w-full flex justify-center">
-                  <div className="transform scale-[0.7] xs:scale-[0.8] sm:scale-100 origin-top transition-transform duration-300">
+              <div className="relative w-full flex justify-center flex-1 items-center">
+                  <div 
+                    className="origin-top transition-transform duration-300"
+                    style={{ transform: `scale(${previewScale})` }}
+                  >
                       <div 
                         ref={certificateRef}
-                        className="w-[400px] h-[640px] bg-white relative shadow-2xl overflow-hidden flex-shrink-0 flex flex-col select-none"
+                        className="w-[400px] h-[640px] relative shadow-2xl overflow-hidden flex-shrink-0 flex flex-col select-none bg-white"
                         style={{ fontFamily: "'Outfit', sans-serif" }} 
                       >
-                          {/* Decorative Border Frame (Outer) */}
-                          <div className={`absolute inset-0 border-[8px] ${currentThemeStyles.border} opacity-20 pointer-events-none z-10 box-border`}></div>
-                          {/* Hand-drawn style Inner Border */}
-                          <div className="absolute inset-3 border-2 border-slate-800 rounded-sm opacity-80 pointer-events-none z-10 box-border"></div>
+                          {/* Top Section: Gradient Header (30% height) */}
+                          <div className={`w-full h-[180px] bg-gradient-to-br ${themeStyle.gradient} relative p-6 flex flex-col justify-between overflow-hidden`}>
+                              {/* Decorative Circles - Fixed for export (removed blur) */}
+                              <div className="absolute top-[-30px] left-[-30px] w-40 h-40 bg-white opacity-10 rounded-full pointer-events-none"></div>
+                              <div className="absolute bottom-[-30px] right-[-20px] w-32 h-32 bg-black opacity-5 rounded-full pointer-events-none"></div>
 
-                          {/* Watermark Icon */}
-                          <div className="absolute bottom-0 right-0 opacity-[0.05] z-0 pointer-events-none">
-                            <ThemeIcon size={400} />
+                              {/* Header Text */}
+                              <div className="flex justify-between items-start z-10 relative">
+                                 <h1 className="text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-sm">
+                                    {data.gradeDisplay}
+                                 </h1>
+                                 <div className="text-right text-white/90">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] mb-0.5">Certificate</p>
+                                    <p className="text-[8px] uppercase tracking-wider opacity-80">of Appreciation</p>
+                                 </div>
+                              </div>
                           </div>
 
-                          {/* 1. TOP SECTION (Fixed PX) */}
-                          <div 
-                            className={`${currentThemeStyles.primary} relative w-full`}
-                            style={{ height: `${HEADER_HEIGHT_PX}px` }}
-                          >
-                              
-                              {/* Grade Letter */}
-                              <div className="absolute top-8 left-8 max-w-[50%]">
-                                <span className={`block text-left text-white font-display font-extrabold opacity-90 drop-shadow-md tracking-tighter leading-[1.1] break-words ${getGradeFontSize(data.gradeDisplay)}`}>
-                                  {data.gradeDisplay}
-                                </span>
-                              </div>
-
-                              {/* Header Info */}
-                              <div className="absolute top-14 right-8 text-right text-white">
-                                <div className="flex flex-col items-end gap-1 opacity-90">
-                                  <div className="h-1.5 w-10 bg-white/60 rounded-full mb-1"></div>
-                                  <h1 className="text-xl font-extrabold uppercase tracking-widest font-display leading-tight">
-                                    Sertifikat<br/>Apresiasi
-                                  </h1>
-                                  <h2 className="text-sm font-medium tracking-wide opacity-90 mt-0.5">
-                                    {currentGradeConfig.label}
-                                  </h2>
+                          {/* Middle Section: Floating Icon */}
+                          <div className="relative -mt-12 flex justify-center z-20">
+                             <div className="w-24 h-24 rounded-full bg-white p-1.5 shadow-lg">
+                                <div className={`w-full h-full rounded-full ${themeStyle.iconBg} flex items-center justify-center border border-slate-100`}>
+                                   <ThemeIcon className={`w-10 h-10 ${themeStyle.text}`} strokeWidth={1.5} />
                                 </div>
-                              </div>
+                             </div>
                           </div>
 
-                          {/* 2. CENTER ICON (Absolute Positioned) */}
-                          <div 
-                            className="absolute left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-20"
-                            style={{ top: `${HEADER_HEIGHT_PX}px` }}
-                          >
-                            <div className={`w-36 h-36 rounded-full bg-white border-[6px] ${currentThemeStyles.border} shadow-lg flex items-center justify-center`}>
-                                <ThemeIcon className={`w-20 h-20 ${currentThemeStyles.accent}`} strokeWidth={1.5} />
-                            </div>
-                          </div>
-
-                          {/* 3. BODY SECTION (Absolute positioning to fill rest) */}
-                          <div className="absolute top-[220px] bottom-0 left-0 right-0 bg-white flex flex-col items-center text-center pt-20 px-6">
+                          {/* Bottom Section: Content */}
+                          <div className="flex-1 px-8 pt-4 pb-8 flex flex-col items-center text-center">
                               
-                              {/* Name & Class Container */}
-                              <div className="w-full flex flex-col items-center">
-                                <h2 className={`text-3xl font-display font-extrabold text-slate-800 mb-1 break-words leading-tight w-full`}>
-                                  {data.studentName || "Nama Siswa"}
-                                </h2>
-                                <p className="text-slate-500 font-bold text-lg tracking-wide uppercase">
-                                  {data.studentClass || "Kelas"}
+                              {/* Decorative Lines - ROUNDED & VISIBLE */}
+                              <div className="flex items-center gap-2 mb-6 opacity-40">
+                                 <div className={`h-1.5 w-12 rounded-full bg-gradient-to-r ${themeStyle.gradient}`}></div>
+                                 <div className={`h-1.5 w-2 rounded-full bg-slate-300`}></div>
+                                 <div className={`h-1.5 w-12 rounded-full bg-gradient-to-r ${themeStyle.gradient}`}></div>
+                              </div>
+
+                              {/* Name & Class */}
+                              <h2 className="text-3xl font-black text-slate-800 leading-tight mb-2">
+                                 {data.studentName || "Nama Siswa"}
+                              </h2>
+                              <p className="text-xs font-bold text-slate-400 uppercase tracking-[0.15em] mb-8">
+                                 {data.studentClass || "Kelas"}
+                              </p>
+
+                              {/* Award Area (Pill) */}
+                              <div className={`px-5 py-1.5 rounded-full ${themeStyle.iconBg} mb-4`}>
+                                 <h3 className={`text-xs font-bold uppercase tracking-wider ${themeStyle.text}`}>
+                                    {data.awardArea}
+                                 </h3>
+                              </div>
+
+                              {/* Quote */}
+                              <div className="flex-1 flex items-center justify-center">
+                                <p className="text-sm text-slate-500 italic font-medium leading-relaxed">
+                                   "{data.generatedMessage}"
                                 </p>
                               </div>
 
-                              {/* Separator Pill */}
-                              <div className="w-12 h-1.5 bg-slate-200 rounded-full my-5 flex-shrink-0"></div>
-
-                              {/* Award & Quote Container */}
-                              <div className="w-full mb-auto flex flex-col items-center">
-                                <h3 className={`text-sm font-black ${currentThemeStyles.accent} uppercase tracking-widest mb-3 font-display`}>
-                                    {data.awardArea}
-                                </h3>
-                                <div className="w-full px-2 max-h-[100px] overflow-hidden flex items-center justify-center">
-                                    <p className="text-slate-600 text-sm font-semibold leading-relaxed opacity-80">
-                                      "{data.generatedMessage}"
-                                    </p>
-                                </div>
-                              </div>
-
-                              {/* Footer (Absolute at bottom) */}
-                              <div className="absolute bottom-10 w-full px-12 flex flex-col gap-5">
-                                  
-                                  {/* Tanggal */}
-                                  <div className="w-full">
-                                    <p className="text-[10px] uppercase font-extrabold text-slate-400 tracking-[0.2em] mb-1.5">Tanggal</p>
-                                    <div className="w-full border-b-[3px] border-slate-800 pb-1.5 text-sm font-bold text-slate-800 font-display">
-                                      {data.date}
+                              {/* Footer: Date & Signature - Stacked Vertically Centered */}
+                              <div className="w-full mt-auto flex flex-col items-center gap-2 pb-2">
+                                 {/* Date Section: Label TOP, Value BOTTOM */}
+                                 <div className="flex flex-col items-center mb-4">
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-1">Tanggal</p>
+                                    <p className="text-sm font-bold text-slate-800">{data.date}</p>
+                                 </div>
+                                 
+                                 {/* Teacher Section: Label TOP, Name BOTTOM */}
+                                 <div className="flex flex-col items-center w-48 relative pt-2">
+                                    <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Guru Kelas</p>
+                                    <div className="w-full text-center">
+                                       <p className="text-sm font-bold text-slate-800">{data.teacherName || "Nama Guru"}</p>
+                                       <div className="w-full h-0.5 bg-slate-800 mt-0.5"></div>
                                     </div>
-                                  </div>
-
-                                  {/* Guru */}
-                                  <div className="w-full">
-                                    <p className="text-[10px] uppercase font-extrabold text-slate-400 tracking-[0.2em] mb-1.5">Guru</p>
-                                    <div className="w-full border-b-[3px] border-slate-800 pb-1.5 text-sm font-bold text-slate-800 font-display">
-                                      {data.teacherName || "Nama Guru"}
-                                    </div>
-                                  </div>
-
+                                 </div>
                               </div>
-
                           </div>
                       </div>
                   </div>
