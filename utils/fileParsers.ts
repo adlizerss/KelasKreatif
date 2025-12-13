@@ -1,14 +1,47 @@
 import * as XLSX from 'xlsx';
 import { Student, BulkCertificateData, CertificateGrade, CertificateThemeColor } from '../types';
 
-export const parseTextFile = async (file: File): Promise<string[]> => {
+export interface ParsedStudent {
+  name: string;
+  gender?: 'M' | 'F';
+  proficiency?: number;
+  proficiencyLabel?: string;
+}
+
+// Helper to map string to proficiency score
+const mapProficiency = (input: string): { score: number, label: string } | undefined => {
+  const normalized = input.trim().toUpperCase();
+  
+  // Level 4: Mahir / Advanced
+  if (['MAHIR', 'ADVANCED', 'SANGAT BAIK', 'A', '4'].some(k => normalized.includes(k))) {
+    return { score: 4, label: 'Mahir' };
+  }
+  // Level 3: Cakap / Proficient
+  if (['CAKAP', 'PROFICIENT', 'BAIK', 'B', '3'].some(k => normalized.includes(k))) {
+    return { score: 3, label: 'Cakap' };
+  }
+  // Level 2: Berkembang / Developing
+  if (['BERKEMBANG', 'DEVELOPING', 'CUKUP', 'C', '2', 'DASAR', 'BASIC'].some(k => normalized.includes(k))) {
+    return { score: 2, label: 'Berkembang' };
+  }
+  // Level 1: Intervensi / Needs Support
+  if (['INTERVENSI', 'BUTUH', 'KURANG', 'D', '1', 'AWAL'].some(k => normalized.includes(k))) {
+    return { score: 1, label: 'Perlu Intervensi' };
+  }
+
+  return undefined;
+};
+
+export const parseTextFile = async (file: File): Promise<ParsedStudent[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
       if (text) {
         const lines = text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line.length > 0);
-        resolve(lines);
+        // Text file assumes just names, no gender/proficiency
+        const parsed: ParsedStudent[] = lines.map(name => ({ name }));
+        resolve(parsed);
       } else {
         resolve([]);
       }
@@ -18,7 +51,7 @@ export const parseTextFile = async (file: File): Promise<string[]> => {
   });
 };
 
-export const parseExcelFile = async (file: File): Promise<string[]> => {
+export const parseExcelFile = async (file: File): Promise<ParsedStudent[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -28,17 +61,48 @@ export const parseExcelFile = async (file: File): Promise<string[]> => {
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         
-        // Convert to array of arrays, assuming first column is names
+        // Use header: 1 to get array of arrays (Row-based)
         const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
         
-        const names: string[] = [];
-        jsonData.forEach((row) => {
+        const students: ParsedStudent[] = [];
+
+        jsonData.forEach((row, index) => {
+          // Skip header row
+          if (index === 0 && typeof row[0] === 'string' && (row[0].toLowerCase().includes('nama') || row[0].toLowerCase().includes('name'))) {
+            return;
+          }
+
           if (row.length > 0 && row[0]) {
             const name = String(row[0]).trim();
-            if (name) names.push(name);
+            if (!name) return;
+
+            // 1. Gender (Column B)
+            let gender: 'M' | 'F' | undefined = undefined;
+            if (row[1]) {
+              const rawGender = String(row[1]).trim().toUpperCase();
+              if (['L', 'M', 'LAKI', 'LAKI-LAKI', 'MALE', 'MAN', 'PRIA'].includes(rawGender)) {
+                gender = 'M';
+              } else if (['P', 'F', 'PEREMPUAN', 'FEMALE', 'WOMAN', 'WANITA'].includes(rawGender)) {
+                gender = 'F';
+              }
+            }
+
+            // 2. Proficiency (Column C)
+            let proficiency: number | undefined = undefined;
+            let proficiencyLabel: string | undefined = undefined;
+            if (row[2]) {
+              const rawProf = String(row[2]);
+              const mapped = mapProficiency(rawProf);
+              if (mapped) {
+                proficiency = mapped.score;
+                proficiencyLabel = mapped.label;
+              }
+            }
+
+            students.push({ name, gender, proficiency, proficiencyLabel });
           }
         });
-        resolve(names);
+        resolve(students);
       } catch (error) {
         reject(error);
       }
@@ -94,10 +158,6 @@ export const parseCertificateExcel = async (file: File): Promise<BulkCertificate
             }
           }
 
-          // Otomatis tentukan Icon/Internal Grade berdasarkan warna
-          // Kuning/Orange -> Crown (S)
-          // Biru/Ungu/Pink/Cyan -> Star (A)
-          // Hijau/Merah/Abu -> ThumbsUp (B)
           let grade: CertificateGrade = 'B';
           if (['yellow', 'orange'].includes(themeColor)) {
             grade = 'S';
@@ -107,16 +167,13 @@ export const parseCertificateExcel = async (file: File): Promise<BulkCertificate
             grade = 'B';
           }
 
-          // Override jika user masih memaksa kolom Grade (Legacy support)
           if (row['Grade']) {
              const manualGrade = row['Grade'].toUpperCase();
              if (['A', 'B', 'S'].includes(manualGrade)) grade = manualGrade as CertificateGrade;
           }
 
-          // Parse Custom Grade Display (Huruf/Teks)
           let gradeDisplay = row['Teks Grade'] || row['Display'] || row['Judul'] || '';
           if (!gradeDisplay) {
-            // Default text jika kosong
             if (grade === 'S') gradeDisplay = 'Luar Biasa';
             else if (grade === 'A') gradeDisplay = 'Sangat Baik';
             else gradeDisplay = 'Baik';
@@ -126,9 +183,9 @@ export const parseCertificateExcel = async (file: File): Promise<BulkCertificate
             id: `cert-${index}`,
             studentName: row['Nama Siswa'] || row['Nama'] || row['Name'] || '',
             studentClass: row['Kelas'] || row['Class'] || '',
-            grade: grade, // Internal logic for Icon
+            grade: grade, 
             themeColor: themeColor,
-            gradeDisplay: gradeDisplay, // Visual Text
+            gradeDisplay: gradeDisplay,
             awardArea: row['Area Penghargaan'] || row['Area'] || 'Partisipasi Aktif',
             specificQuote: row['Kutipan Khusus'] || row['Quote'] || '',
             teacherName: row['Nama Guru'] || row['Guru'] || '',
@@ -158,38 +215,10 @@ export const generateSampleCertificateExcel = () => {
       "Nama Guru": "Bpk. Joko",
       "Tanggal": "20 Oktober 2023"
     },
-    {
-      "Nama Siswa": "Siti Aminah",
-      "Kelas": "XII IPA 2",
-      "Warna (1-9)": 4,
-      "Teks Grade": "Sangat Baik",
-      "Area Penghargaan": "Matematika Terbaik",
-      "Kutipan Khusus": "Mendapat nilai sempurna",
-      "Nama Guru": "Bpk. Joko",
-      "Tanggal": "20 Oktober 2023"
-    },
-    {
-      "Nama Siswa": "Doni Kurnia",
-      "Kelas": "XII IPS 1",
-      "Warna (1-9)": 3,
-      "Teks Grade": "Luar Biasa",
-      "Area Penghargaan": "Seni & Kreativitas",
-      "Kutipan Khusus": "Juara 1 lomba poster",
-      "Nama Guru": "Bpk. Joko",
-      "Tanggal": "20 Oktober 2023"
-    }
   ]);
 
-  // Adjust column widths
   ws['!cols'] = [
-    { wch: 20 }, // Nama
-    { wch: 10 }, // Kelas
-    { wch: 12 }, // Warna
-    { wch: 15 }, // Teks Grade
-    { wch: 20 }, // Area
-    { wch: 30 }, // Kutipan
-    { wch: 15 }, // Guru
-    { wch: 15 }  // Tanggal
+    { wch: 20 }, { wch: 10 }, { wch: 12 }, { wch: 15 }, { wch: 20 }, { wch: 30 }, { wch: 15 }, { wch: 15 }
   ];
 
   const wb = XLSX.utils.book_new();
@@ -198,25 +227,34 @@ export const generateSampleCertificateExcel = () => {
 };
 
 export const generateStudentListTemplate = () => {
+  // Updated template with clearer instructions for Gender and Proficiency
   const ws = XLSX.utils.json_to_sheet([
-    { "Nama Siswa": "Andi Pratama" },
-    { "Nama Siswa": "Budi Santoso" },
-    { "Nama Siswa": "Citra Lestari" },
-    { "Nama Siswa": "Dewi Sartika" },
-    { "Nama Siswa": "Eko Purnomo" }
+    { "Nama Siswa": "Andi Pratama", "Jenis Kelamin (L/P)": "L", "Kemampuan (Mahir/Cakap/Dasar/Intervensi)": "Mahir" },
+    { "Nama Siswa": "Siti Aminah", "Jenis Kelamin (L/P)": "P", "Kemampuan (Mahir/Cakap/Dasar/Intervensi)": "Cakap" },
+    { "Nama Siswa": "Budi Santoso", "Jenis Kelamin (L/P)": "L", "Kemampuan (Mahir/Cakap/Dasar/Intervensi)": "Dasar" },
+    { "Nama Siswa": "Dewi Sartika", "Jenis Kelamin (L/P)": "P", "Kemampuan (Mahir/Cakap/Dasar/Intervensi)": "Intervensi" },
   ]);
   
-  // Set column width
-  ws['!cols'] = [{ wch: 30 }];
+  ws['!cols'] = [{ wch: 30 }, { wch: 15 }, { wch: 40 }];
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Daftar Siswa");
-  XLSX.writeFile(wb, "Template_Daftar_Siswa.xlsx");
+  XLSX.writeFile(wb, "Template_Daftar_Siswa_Lengkap.xlsx");
 };
 
-export const processRawNames = (names: string[]): Student[] => {
-  return names.map((name) => ({
-    id: Math.random().toString(36).substr(2, 9),
-    name: name,
-  }));
+export const processRawNames = (inputs: (string | ParsedStudent)[]): Student[] => {
+  return inputs.map((item) => {
+    const name = typeof item === 'string' ? item : item.name;
+    const gender = typeof item === 'string' ? undefined : item.gender;
+    const proficiency = typeof item === 'string' ? undefined : item.proficiency;
+    const proficiencyLabel = typeof item === 'string' ? undefined : item.proficiencyLabel;
+    
+    return {
+      id: Math.random().toString(36).substr(2, 9),
+      name: name,
+      gender: gender,
+      proficiency: proficiency,
+      proficiencyLabel: proficiencyLabel
+    };
+  });
 };

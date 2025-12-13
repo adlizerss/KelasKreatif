@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { CertificateData, BulkCertificateData, CertificateGrade, CertificateThemeColor } from '../types';
 import { AWARD_AREAS, generateCertificateMessage } from '../utils/certificateHelpers';
 import { parseCertificateExcel, generateSampleCertificateExcel } from '../utils/fileParsers';
-import { Award, Crown, Star, ThumbsUp, Download, Printer, Users, FileSpreadsheet, CheckCircle, ChevronLeft, ChevronRight, Package, Palette, Check, Type, Sparkles } from 'lucide-react';
+import { Award, Crown, Star, ThumbsUp, Download, Printer, Users, FileSpreadsheet, CheckCircle, ChevronLeft, ChevronRight, Package, Palette, Check, Type, Sparkles, Share2, Copy } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
@@ -417,6 +417,50 @@ const CertificateGenerator: React.FC = () => {
     }
   };
 
+  // --- SHARE HANDLER ---
+  const handleShareToWhatsApp = async () => {
+    if (!certificateRef.current) return;
+    setIsGenerating(true);
+    
+    try {
+      // 1. Capture Image
+      const dataUrl = await captureHighQuality(certificateRef.current);
+      
+      // 2. Convert DataURL to Blob/File
+      const blob = await (await fetch(dataUrl)).blob();
+      const file = new File([blob], `sertifikat-${data.studentName || 'siswa'}.png`, { type: 'image/png' });
+
+      // 3. Try Native Sharing (Mobile)
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Sertifikat Prestasi',
+          text: `Selamat kepada ${data.studentName} atas pencapaiannya!`,
+        });
+      } else {
+        // 4. Fallback for Desktop (Clipboard)
+        try {
+          const clipboardItem = new ClipboardItem({ 'image/png': blob });
+          await navigator.clipboard.write([clipboardItem]);
+          alert("Gambar telah disalin ke Clipboard! \n\nSilakan buka WhatsApp Web dan tekan Paste (Ctrl+V) di chat.");
+        } catch (clipErr) {
+          console.error("Clipboard failed", clipErr);
+          // Last Resort: Just download it
+          const link = document.createElement("a");
+          link.href = dataUrl;
+          link.download = `Kartu-${data.studentName || 'Siswa'}.png`;
+          link.click();
+          alert("Browser ini tidak mendukung share otomatis. Gambar telah diunduh, silakan kirim manual ke WhatsApp.");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Gagal memproses gambar untuk dibagikan.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   // --- GRADE & THEME LOGIC ---
   const currentGradeConfig = {
     B: { icon: ThumbsUp, label: 'Certificate of Excellence' },
@@ -708,23 +752,34 @@ const CertificateGenerator: React.FC = () => {
           
           {/* Action Buttons */}
           {mode === 'single' ? (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-3">
               <button
-                onClick={handleDownloadImage}
-                disabled={isGenerating}
-                className="flex items-center justify-center gap-2 py-3 px-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-colors"
-              >
-                <Download className="w-5 h-5" />
-                Simpan PNG
-              </button>
-              <button
-                onClick={handleDownloadPDF}
-                disabled={isGenerating}
-                className="flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 shadow-md transition-colors"
-              >
-                <Printer className="w-5 h-5" />
-                PDF (A4)
-              </button>
+                  onClick={handleShareToWhatsApp}
+                  disabled={isGenerating}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 shadow-md transition-colors"
+                  title="Share to WhatsApp"
+                >
+                  <Share2 className="w-5 h-5" />
+                  Bagikan ke WhatsApp
+                </button>
+              <div className="grid grid-cols-2 gap-4">
+                <button
+                  onClick={handleDownloadImage}
+                  disabled={isGenerating}
+                  className="flex items-center justify-center gap-2 py-3 px-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 font-semibold rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 shadow-sm transition-colors"
+                >
+                  <Download className="w-5 h-5" />
+                  Simpan PNG
+                </button>
+                <button
+                  onClick={handleDownloadPDF}
+                  disabled={isGenerating}
+                  className="flex items-center justify-center gap-2 py-3 px-4 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 shadow-md transition-colors"
+                >
+                  <Printer className="w-5 h-5" />
+                  PDF (A4)
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">

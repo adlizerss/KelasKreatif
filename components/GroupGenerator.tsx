@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Student, GroupConfig, GroupingMode, GroupResult } from '../types';
+import { Student, GroupConfig, GroupingMode, GroupResult, DistributionStrategy } from '../types';
 import InputSection from './InputSection';
 import ConfigSection from './ConfigSection';
 import ResultsSection from './ResultsSection';
@@ -11,6 +11,7 @@ const GroupGenerator: React.FC = () => {
   const [config, setConfig] = useState<GroupConfig>({
     mode: GroupingMode.BY_COUNT,
     value: 0,
+    strategy: DistributionStrategy.RANDOM,
     namingPattern: '',
     namingType: 'auto',
     customNames: [],
@@ -33,7 +34,7 @@ const GroupGenerator: React.FC = () => {
       return;
     }
 
-    const newGroups = generateGroups(students, config.mode, config.value, config.namingPattern, config.customNames, config.namingType);
+    const newGroups = generateGroups(students, config.mode, config.value, config.strategy, config.namingPattern, config.customNames, config.namingType);
     setGroups(newGroups);
     setIsGenerated(true);
     

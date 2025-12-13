@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { Settings, Users, Hash, Type, Upload, List } from 'lucide-react';
-import { GroupConfig, GroupingMode, NamingType } from '../types';
-import { parseTextFile, parseExcelFile } from '../utils/fileParsers';
+import { Settings, Users, Hash, Type, Upload, List, GitMerge, Scale, Shuffle, Layers, UserCheck } from 'lucide-react';
+import { GroupConfig, GroupingMode, NamingType, DistributionStrategy } from '../types';
+import { parseTextFile, parseExcelFile, ParsedStudent } from '../utils/fileParsers';
 
 interface ConfigSectionProps {
   config: GroupConfig;
@@ -15,6 +15,10 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({ config, setConfig, totalS
 
   const handleModeChange = (mode: GroupingMode) => {
     setConfig({ ...config, mode });
+  };
+  
+  const handleStrategyChange = (strategy: DistributionStrategy) => {
+    setConfig({ ...config, strategy });
   };
 
   const handleNamingTypeChange = (type: NamingType) => {
@@ -42,15 +46,17 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({ config, setConfig, totalS
 
     setIsLoading(true);
     try {
-      let names: string[] = [];
+      let parsedData: ParsedStudent[] = [];
       if (file.name.endsWith('.txt')) {
-        names = await parseTextFile(file);
+        parsedData = await parseTextFile(file);
       } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.csv')) {
-        names = await parseExcelFile(file);
+        parsedData = await parseExcelFile(file);
       } else {
         alert('Format file tidak didukung. Harap gunakan .txt, .xlsx, atau .csv');
         return;
       }
+
+      const names = parsedData.map(p => p.name);
 
       if (names.length > 0) {
         setConfig({ ...config, customNames: names });
@@ -90,10 +96,10 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({ config, setConfig, totalS
         </h2>
       </div>
       
-      <div className="p-6 space-y-6">
+      <div className="p-6 space-y-8">
         {/* Mode Selection */}
         <div className="space-y-3">
-          <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">Metode Pembagian</label>
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">Metode Target</label>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <label className={`relative flex items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${config.mode === GroupingMode.BY_COUNT ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-500' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'}`}>
               <input
@@ -133,6 +139,68 @@ const ConfigSection: React.FC<ConfigSectionProps> = ({ config, setConfig, totalS
               </div>
             </label>
           </div>
+        </div>
+        
+        {/* Distribution Strategy Selection */}
+        <div className="space-y-3">
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300 block">Strategi Distribusi Siswa</label>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+             {/* Random */}
+             <button
+               onClick={() => handleStrategyChange(DistributionStrategy.RANDOM)}
+               className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${config.strategy === DistributionStrategy.RANDOM ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+             >
+                <Shuffle className="w-5 h-5 text-slate-500" />
+                <div>
+                   <div className="text-sm font-bold text-slate-800 dark:text-slate-100">Acak Murni</div>
+                   <div className="text-[10px] text-slate-500">Peluang sama rata</div>
+                </div>
+             </button>
+
+             {/* Gender Balance */}
+             <button
+               onClick={() => handleStrategyChange(DistributionStrategy.GENDER_BALANCE)}
+               className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${config.strategy === DistributionStrategy.GENDER_BALANCE ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+             >
+                <Scale className="w-5 h-5 text-pink-500" />
+                <div>
+                   <div className="text-sm font-bold text-slate-800 dark:text-slate-100">Seimbangkan Gender</div>
+                   <div className="text-[10px] text-slate-500">L/P rata tiap kelompok</div>
+                </div>
+             </button>
+
+             {/* Heterogeneous (Mixed Ability) */}
+             <button
+               onClick={() => handleStrategyChange(DistributionStrategy.ABILITY_HETEROGENEOUS)}
+               className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${config.strategy === DistributionStrategy.ABILITY_HETEROGENEOUS ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+             >
+                <GitMerge className="w-5 h-5 text-emerald-500" />
+                <div>
+                   <div className="text-sm font-bold text-slate-800 dark:text-slate-100">Campur Kemampuan</div>
+                   <div className="text-[10px] text-slate-500">Mahir dicampur dengan Intervensi</div>
+                </div>
+             </button>
+
+             {/* Gender + Heterogeneous (NEW) */}
+             <button
+               onClick={() => handleStrategyChange(DistributionStrategy.GENDER_AND_ABILITY_HETEROGENEOUS)}
+               className={`flex items-center gap-3 p-3 rounded-lg border-2 text-left transition-all ${config.strategy === DistributionStrategy.GENDER_AND_ABILITY_HETEROGENEOUS ? 'border-indigo-600 bg-indigo-50 dark:bg-indigo-900/20' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300'}`}
+             >
+                <div className="flex -space-x-1">
+                  <UserCheck className="w-5 h-5 text-pink-500" />
+                  <GitMerge className="w-5 h-5 text-emerald-500" />
+                </div>
+                <div>
+                   <div className="text-sm font-bold text-slate-800 dark:text-slate-100">Gender + Campur</div>
+                   <div className="text-[10px] text-slate-500">Seimbang L/P dan kemampuan</div>
+                </div>
+             </button>
+          </div>
+          {(config.strategy === DistributionStrategy.ABILITY_HETEROGENEOUS || config.strategy === DistributionStrategy.GENDER_AND_ABILITY_HETEROGENEOUS) && (
+              <p className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-2 rounded border border-amber-200 dark:border-amber-800/30">
+                 ⚠️ Memerlukan data kolom 'Kemampuan' di Excel (Mahir, Cakap, Dasar, Intervensi).
+              </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

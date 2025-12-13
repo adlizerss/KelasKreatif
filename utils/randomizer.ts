@@ -1,4 +1,4 @@
-import { Student, GroupResult, GroupingMode, NamingType } from '../types';
+import { Student, GroupResult, GroupingMode, NamingType, DistributionStrategy } from '../types';
 
 // Fisher-Yates Shuffle Algorithm
 export const shuffleArray = <T,>(array: T[]): T[] => {
@@ -14,64 +14,164 @@ export const generateGroups = (
   students: Student[],
   mode: GroupingMode,
   value: number,
+  strategy: DistributionStrategy,
   namingPattern: string,
   customNames: string[] = [],
   namingType: NamingType = 'auto'
 ): GroupResult[] => {
-  const shuffledStudents = shuffleArray(students);
-  const totalStudents = shuffledStudents.length;
-  const groups: GroupResult[] = [];
-  const baseName = namingPattern.trim() || 'Kelompok';
-
+  const totalStudents = students.length;
   if (totalStudents === 0) return [];
 
+  const baseName = namingPattern.trim() || 'Kelompok';
+  let groups: GroupResult[] = [];
+  let numGroups = 0;
+
+  // 1. Determine Number of Groups
   if (mode === GroupingMode.BY_COUNT) {
-    const numGroups = Math.max(1, Math.min(value, totalStudents));
-    
-    // Initialize groups
-    for (let i = 0; i < numGroups; i++) {
-      let groupName = `${baseName} ${i + 1}`;
-      
-      // Use custom name if available and type is custom
-      if (namingType === 'custom' && customNames[i]) {
-        groupName = customNames[i];
-      }
-
-      groups.push({
-        id: `g-${i}`,
-        name: groupName,
-        members: [],
-      });
-    }
-
-    // Distribute students
-    shuffledStudents.forEach((student, index) => {
-      const groupIndex = index % numGroups;
-      groups[groupIndex].members.push(student);
-    });
-
+    numGroups = Math.max(1, Math.min(value, totalStudents));
   } else if (mode === GroupingMode.BY_SIZE) {
     const groupSize = Math.max(1, value);
-    const numGroups = Math.ceil(totalStudents / groupSize);
+    numGroups = Math.ceil(totalStudents / groupSize);
+  }
 
-    for (let i = 0; i < numGroups; i++) {
-      let groupName = `${baseName} ${i + 1}`;
-
-      // Use custom name if available and type is custom
-      if (namingType === 'custom' && customNames[i]) {
-        groupName = customNames[i];
-      }
-
-      const startIdx = i * groupSize;
-      const endIdx = startIdx + groupSize;
-      const members = shuffledStudents.slice(startIdx, endIdx);
-
-      groups.push({
-        id: `g-${i}`,
-        name: groupName,
-        members,
-      });
+  // 2. Initialize Groups
+  for (let i = 0; i < numGroups; i++) {
+    let groupName = `${baseName} ${i + 1}`;
+    if (namingType === 'custom' && customNames[i]) {
+      groupName = customNames[i];
     }
+    groups.push({
+      id: `g-${i}`,
+      name: groupName,
+      members: [],
+    });
+  }
+
+  let studentsToDistribute = [...students];
+
+  // 3. Logic based on Strategy
+  if (strategy === DistributionStrategy.ABILITY_HETEROGENEOUS) {
+    // HETEROGENEOUS: Mix high and low proficiency in each group
+    // Sort students by proficiency Score DESC (4, 3, 2, 1, undefined)
+    studentsToDistribute.sort((a, b) => (b.proficiency || 0) - (a.proficiency || 0));
+    
+    const tier4 = shuffleArray(studentsToDistribute.filter(s => s.proficiency === 4));
+    const tier3 = shuffleArray(studentsToDistribute.filter(s => s.proficiency === 3));
+    const tier2 = shuffleArray(studentsToDistribute.filter(s => s.proficiency === 2));
+    const tier1 = shuffleArray(studentsToDistribute.filter(s => s.proficiency === 1));
+    const tierNone = shuffleArray(studentsToDistribute.filter(s => !s.proficiency));
+    
+    const sortedAndShuffled = [...tier4, ...tier3, ...tier2, ...tier1, ...tierNone];
+    
+    sortedAndShuffled.forEach((student, index) => {
+      groups[index % numGroups].members.push(student);
+    });
+
+  } else if (strategy === DistributionStrategy.GENDER_BALANCE) {
+    // GENDER BALANCE ONLY (Random Ability)
+    const males = students.filter(s => s.gender === 'M');
+    const females = students.filter(s => s.gender === 'F');
+    const unknown = students.filter(s => !s.gender);
+
+    const shuffledMales = shuffleArray(males);
+    const shuffledFemales = shuffleArray(females);
+    const shuffledUnknown = shuffleArray(unknown);
+
+    let currentIndex = 0;
+    shuffledMales.forEach(student => {
+      groups[currentIndex % numGroups].members.push(student);
+      currentIndex++;
+    });
+
+    currentIndex = 0;
+    shuffledFemales.forEach(student => {
+      groups[currentIndex % numGroups].members.push(student);
+      currentIndex++;
+    });
+
+    shuffledUnknown.forEach(student => {
+      // Load balance unknowns
+      let minSize = Infinity;
+      let targetGroupIndex = 0;
+      for(let i=0; i<numGroups; i++) {
+          if(groups[i].members.length < minSize) {
+              minSize = groups[i].members.length;
+              targetGroupIndex = i;
+          }
+      }
+      groups[targetGroupIndex].members.push(student);
+    });
+    
+    groups.forEach(g => { g.members = shuffleArray(g.members) });
+
+  } else if (strategy === DistributionStrategy.GENDER_AND_ABILITY_HETEROGENEOUS) {
+    // NEW: GENDER BALANCE + HETEROGENEOUS ABILITY
+    
+    // 1. Separate Gender
+    const males = students.filter(s => s.gender === 'M');
+    const females = students.filter(s => s.gender === 'F');
+    const unknown = students.filter(s => !s.gender);
+
+    // 2. Sort Each Gender by Ability DESC (Best first)
+    // This ensures that when we distribute round-robin, G1 gets top Male, G2 gets 2nd Male...
+    // Creating heterogeneous mix vertically within each group.
+    males.sort((a, b) => (b.proficiency || 0) - (a.proficiency || 0));
+    females.sort((a, b) => (b.proficiency || 0) - (a.proficiency || 0));
+    unknown.sort((a, b) => (b.proficiency || 0) - (a.proficiency || 0));
+
+    // 3. Distribute Males
+    let currentIndex = 0;
+    males.forEach(student => {
+      groups[currentIndex % numGroups].members.push(student);
+      currentIndex++;
+    });
+
+    // 4. Distribute Females 
+    // We reset index to 0. Since both lists are sorted High->Low, 
+    // G1 will get High Male and High Female. This creates balanced "Power" groups if not careful,
+    // but satisfies "Heterogeneous" definition (Mixed abilities within group is hard if everyone is High).
+    // Actually, "Heterogeneous" usually means a group has {High, Mid, Low}. 
+    // Round robin on a Sorted list DOES produce {High, Mid, Low} in each group if the list is long enough.
+    // Example: 10 students (Prof: 4,4,3,3,2,2,1,1,1,1) -> 2 Groups.
+    // G1: 4, 3, 2, 1, 1
+    // G2: 4, 3, 2, 1, 1
+    // This is perfect heterogeneity.
+    currentIndex = 0;
+    females.forEach(student => {
+      groups[currentIndex % numGroups].members.push(student);
+      currentIndex++;
+    });
+
+    // 5. Distribute Unknowns (Smart fill)
+    unknown.forEach(student => {
+      // Find group with fewest members to maintain size balance
+      let minSize = Infinity;
+      let targetGroupIndex = 0;
+      
+      // Simple loop to find min
+      for(let i=0; i<numGroups; i++) {
+        if(groups[i].members.length < minSize) {
+           minSize = groups[i].members.length;
+           targetGroupIndex = i;
+        }
+      }
+      groups[targetGroupIndex].members.push(student);
+    });
+
+    // 6. Final Shuffle Internal Order (so it doesn't look sorted)
+    groups.forEach(g => { g.members = shuffleArray(g.members) });
+
+  } else {
+    // RANDOM (Default)
+    const shuffled = shuffleArray(studentsToDistribute);
+    shuffled.forEach((student, index) => {
+      groups[index % numGroups].members.push(student);
+    });
+  }
+
+  // Final cleanup: Ensure random internal order if strictly sorted (like Homogeneous or Hetero)
+  if (strategy === DistributionStrategy.ABILITY_HETEROGENEOUS || strategy === DistributionStrategy.GENDER_AND_ABILITY_HETEROGENEOUS) {
+      groups.forEach(g => { g.members = shuffleArray(g.members) });
   }
 
   return groups;
