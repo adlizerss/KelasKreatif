@@ -217,7 +217,7 @@ const InputSection: React.FC<InputSectionProps> = ({ onStudentsLoaded, currentCo
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileUpload}
-                accept=".txt,.csv,.xlsx"
+                accept=".txt,.csv,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
                 className="hidden"
               />
               {isLoading ? (

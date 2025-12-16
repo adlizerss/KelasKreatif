@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Settings, Volume2, Bell, CheckCircle, Clock, Calculator, Square, SkipForward, Zap, Users, Mic, BookOpen, Hourglass, ClipboardList } from 'lucide-react';
+import { Play, Pause, RotateCcw, Settings, Volume2, Bell, CheckCircle, Clock, Calculator, Zap, Users, Mic, BookOpen, ClipboardList, Edit3, ArrowRight, SkipForward } from 'lucide-react';
 
 type SegmentType = 'opening' | 'core' | 'closing' | 'single';
 
@@ -16,12 +16,12 @@ const ALARM_TYPES = [
   { id: 'digital', label: 'Alarm Digital' },
 ];
 
-const PRESETS = [
-  { label: 'Ice Breaking', duration: 3, icon: Zap, color: 'text-yellow-600 dark:text-yellow-400', ringColor: 'text-yellow-500' },
-  { label: 'Presentasi', duration: 5, icon: Mic, color: 'text-purple-600 dark:text-purple-400', ringColor: 'text-purple-500' },
-  { label: 'Diskusi', duration: 15, icon: Users, color: 'text-blue-600 dark:text-blue-400', ringColor: 'text-blue-500' },
-  { label: 'Tugas', duration: 30, icon: BookOpen, color: 'text-emerald-600 dark:text-emerald-400', ringColor: 'text-emerald-500' },
-  { label: 'Ujian', duration: 60, icon: ClipboardList, color: 'text-rose-600 dark:text-rose-400', ringColor: 'text-rose-500' },
+const DEFAULT_PRESETS = [
+  { label: 'Ice Breaking', duration: 3, icon: Zap, color: 'text-yellow-600 dark:text-yellow-400' },
+  { label: 'Presentasi', duration: 5, icon: Mic, color: 'text-purple-600 dark:text-purple-400' },
+  { label: 'Diskusi', duration: 15, icon: Users, color: 'text-blue-600 dark:text-blue-400' },
+  { label: 'Tugas', duration: 30, icon: BookOpen, color: 'text-emerald-600 dark:text-emerald-400' },
+  { label: 'Ujian', duration: 60, icon: ClipboardList, color: 'text-rose-600 dark:text-rose-400' },
 ];
 
 // Helper to format time MM:SS
@@ -88,6 +88,10 @@ const TimeKeeper: React.FC = () => {
   ]);
   const [totalTimeInput, setTotalTimeInput] = useState<number | ''>(60);
   const [selectedSound, setSelectedSound] = useState('classic');
+  
+  // Custom Box State (Transient, not saved to presets)
+  const [customBoxName, setCustomBoxName] = useState('Kustom');
+  const [customBoxDuration, setCustomBoxDuration] = useState<number | ''>('');
 
   // Timer State
   const [activeSegmentIndex, setActiveSegmentIndex] = useState<number>(-1); 
@@ -194,9 +198,15 @@ const TimeKeeper: React.FC = () => {
     };
   }, []);
 
+  // Sync Total Input with Config (Only when config actually changes not via input)
+  // We avoid auto-setting if the user is typing (managed by handling logic below)
   useEffect(() => {
     const sum = config.reduce((acc, curr) => acc + curr.durationMinutes, 0);
-    setTotalTimeInput(sum);
+    // Only update if not currently editing (handled by checking focus or logic flow, 
+    // but here we just ensure we don't force '0' if it should be empty)
+    if (sum !== 0 && totalTimeInput !== '') {
+       setTotalTimeInput(sum);
+    }
   }, [config]);
 
   // --- TIMER LOGIC ---
@@ -231,9 +241,6 @@ const TimeKeeper: React.FC = () => {
       setActiveSegmentIndex(0);
     }
 
-    // FIX: If starting from Setup Mode, always re-sync timeLeft from the Config.
-    // This ensures that if the user edited the input manually after clicking a preset,
-    // we use the edited value (config), not the stale timeLeft state.
     if (isSetupMode && config[startIndex]) {
        setTimeLeft(config[startIndex].durationMinutes * 60);
     }
@@ -258,34 +265,36 @@ const TimeKeeper: React.FC = () => {
     stopAlarmAndProceed();
   };
 
-  const handlePresetClick = (preset: typeof PRESETS[0]) => {
-     // Apply preset to config, but DO NOT start immediately
+  const handlePresetClick = (duration: number, label: string, color: string) => {
      setConfig([
        { 
          id: 'single', 
-         label: preset.label, 
-         durationMinutes: preset.duration, 
-         color: preset.color
+         label: label, 
+         durationMinutes: duration, 
+         color: color
         }
      ]);
-     setTotalTimeInput(preset.duration);
-     
-     // Reset setup state so user can review/edit
+     setTotalTimeInput(duration);
      setActiveSegmentIndex(0);
-     setTimeLeft(preset.duration * 60);
-     // Stay in setup mode
+     setTimeLeft(duration * 60);
      setIsSetupMode(true);
   };
 
+  const applyCustomBox = () => {
+     const dur = customBoxDuration === '' ? 0 : customBoxDuration;
+     if(dur <= 0) return;
+
+     handlePresetClick(dur, customBoxName || 'Kustom', 'text-slate-600 dark:text-slate-300');
+  }
+
   const handleDurationChange = (index: number, val: string) => {
-    const num = parseInt(val) || 0;
+    const num = val === '' ? 0 : parseInt(val);
     const newConfig = [...config];
     newConfig[index].durationMinutes = num;
     setConfig(newConfig);
     
-    // Optional: Update total input helper if it's a single segment
     if (newConfig.length === 1) {
-        setTotalTimeInput(num);
+        setTotalTimeInput(val === '' ? '' : num);
     }
   };
 
@@ -303,7 +312,7 @@ const TimeKeeper: React.FC = () => {
       const core = total - (sideDuration * 2);
       setConfig([
         { id: 'opening', label: 'Pembuka', durationMinutes: sideDuration, color: 'text-blue-600 dark:text-blue-400' },
-        { id: 'core', label: 'Kegiatan Inti', durationMinutes: core, color: 'text-emerald-600 dark:text-emerald-400' },
+        { id: 'core', label: 'Kegiatan Inti', durationMinutes: core > 0 ? core : 0, color: 'text-emerald-600 dark:text-emerald-400' },
         { id: 'closing', label: 'Penutup', durationMinutes: sideDuration, color: 'text-orange-600 dark:text-orange-400' },
       ]);
     }
@@ -352,14 +361,18 @@ const TimeKeeper: React.FC = () => {
               
               {/* 1. Quick Presets */}
               <div className="space-y-4">
-                 <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
-                   <Zap className="w-4 h-4" /> Preset Aktivitas
-                 </h3>
-                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    {PRESETS.map((preset) => (
+                 <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
+                      <Zap className="w-4 h-4" /> Preset Cepat
+                    </h3>
+                 </div>
+                 
+                 <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                    {/* Default Presets */}
+                    {DEFAULT_PRESETS.map((preset) => (
                       <button
                         key={preset.label}
-                        onClick={() => handlePresetClick(preset)}
+                        onClick={() => handlePresetClick(preset.duration, preset.label, preset.color)}
                         className="flex flex-col items-center justify-center p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-orange-400 dark:hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 hover:shadow-md transition-all group bg-white dark:bg-slate-800/80"
                       >
                          <div className={`p-2.5 rounded-full bg-slate-100 dark:bg-slate-700 group-hover:bg-white dark:group-hover:bg-slate-600 mb-2 transition-colors`}>
@@ -369,6 +382,39 @@ const TimeKeeper: React.FC = () => {
                          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">{preset.duration} Menit</span>
                       </button>
                     ))}
+                    
+                    {/* CUSTOM BOX (Immediate Custom) */}
+                    <div className="flex flex-col gap-1 p-2 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+                        <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-700 pb-1 mb-1">
+                             <Edit3 className="w-3 h-3 text-slate-400" />
+                             <input 
+                               type="text" 
+                               value={customBoxName}
+                               onChange={(e) => setCustomBoxName(e.target.value)}
+                               placeholder="Nama..."
+                               className="w-full bg-transparent text-xs font-bold text-slate-700 dark:text-slate-200 focus:outline-none placeholder-slate-400"
+                             />
+                        </div>
+                        <div className="flex items-center gap-1 mt-auto">
+                             <div className="relative flex-1">
+                                <input 
+                                    type="number"
+                                    value={customBoxDuration}
+                                    onChange={(e) => setCustomBoxDuration(e.target.value === '' ? '' : parseInt(e.target.value))}
+                                    placeholder="0"
+                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-1 text-xs text-center py-1 text-slate-800 dark:text-slate-200 font-mono focus:ring-1 focus:ring-orange-500"
+                                />
+                                <span className="absolute right-1 top-1.5 text-[8px] text-slate-400 pointer-events-none">m</span>
+                             </div>
+                             <button 
+                               onClick={applyCustomBox}
+                               className="bg-orange-500 hover:bg-orange-600 text-white p-1 rounded transition-colors"
+                               title="Mulai"
+                             >
+                               <ArrowRight className="w-4 h-4" />
+                             </button>
+                        </div>
+                    </div>
                  </div>
               </div>
 
@@ -376,24 +422,26 @@ const TimeKeeper: React.FC = () => {
 
               {/* 2. Manual Config */}
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                    <h3 className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-2">
                      <Settings className="w-4 h-4" /> Pengaturan Waktu
                    </h3>
-                   {config.length > 1 && (
-                     <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-lg">
-                        <Calculator className="w-4 h-4 text-slate-500" />
-                        <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Total:</span>
-                        <input 
-                          type="number" 
-                          value={totalTimeInput}
-                          onChange={(e) => handleTotalTimeChange(e.target.value)}
-                          className="w-12 bg-transparent border-b border-slate-400 text-center text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-orange-500"
-                          placeholder="0"
-                        />
-                        <span className="text-xs text-slate-500">mnt</span>
-                     </div>
-                   )}
+                   <div className="flex items-center gap-3">
+                     {config.length > 1 && (
+                        <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-700 px-3 py-1.5 rounded-lg">
+                            <Calculator className="w-4 h-4 text-slate-500" />
+                            <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Total:</span>
+                            <input 
+                            type="number" 
+                            value={totalTimeInput}
+                            onChange={(e) => handleTotalTimeChange(e.target.value)}
+                            className="w-12 bg-transparent border-b border-slate-400 text-center text-sm font-bold text-slate-800 dark:text-slate-200 focus:outline-none focus:border-orange-500"
+                            placeholder="0"
+                            />
+                            <span className="text-xs text-slate-500">mnt</span>
+                        </div>
+                     )}
+                   </div>
                 </div>
 
                 <div className={`grid grid-cols-1 ${config.length > 1 ? 'md:grid-cols-3' : 'md:grid-cols-1'} gap-4`}>
@@ -405,9 +453,10 @@ const TimeKeeper: React.FC = () => {
                         <input
                           type="number"
                           min="0"
-                          value={segment.durationMinutes}
+                          value={segment.durationMinutes === 0 ? '' : segment.durationMinutes}
                           onChange={(e) => handleDurationChange(idx, e.target.value)}
                           className="w-full text-2xl font-bold bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg py-2 px-3 text-slate-800 dark:text-slate-200 focus:ring-2 focus:ring-orange-500"
+                          placeholder="0"
                         />
                         <span className="text-sm font-medium text-slate-500">mnt</span>
                       </div>

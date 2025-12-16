@@ -1,6 +1,6 @@
 import React from 'react';
 import { GroupResult } from '../types';
-import { Download, FileText, File as FileIcon, User, SignalHigh, SignalMedium, SignalLow, Signal } from 'lucide-react';
+import { FileText, File as FileIcon, SignalHigh, SignalMedium, SignalLow, Info } from 'lucide-react';
 import { exportToDocx, exportToTxt } from '../utils/exporters';
 import { motion } from 'framer-motion';
 
@@ -9,28 +9,48 @@ interface ResultsSectionProps {
 }
 
 const ProficiencyBadge = ({ score, label }: { score?: number, label?: string }) => {
-  if (!score) return null;
+  // Jika tidak ada score, jangan render apapun (untuk siswa tanpa data kemampuan)
+  if (score === undefined || score === null) return null;
   
-  let colorClass = "bg-slate-100 text-slate-600";
-  let icon = <Signal className="w-3 h-3" />;
+  // Default Style (Fallback)
+  let colorClass = "bg-slate-100 text-slate-600 border-slate-200";
+  let icon = <SignalLow className="w-3 h-3" />;
+  let defaultLabel = "Umum";
 
-  if (score === 4) { // Mahir
-     colorClass = "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400";
-     icon = <SignalHigh className="w-3 h-3" />;
-  } else if (score === 3) { // Cakap
-     colorClass = "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
-     icon = <SignalMedium className="w-3 h-3" />;
-  } else if (score === 2) { // Dasar
-     colorClass = "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400";
-     icon = <SignalLow className="w-3 h-3" />;
-  } else if (score === 1) { // Intervensi
-     colorClass = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400";
-     icon = <Signal className="w-3 h-3 rotate-90" />; // Custom icon or reuse
+  // Logika Eksplisit untuk setiap Level
+  switch (score) {
+    case 4: // Mahir
+      colorClass = "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800";
+      icon = <SignalHigh className="w-3 h-3" />;
+      defaultLabel = "Mahir";
+      break;
+    case 3: // Cakap
+      colorClass = "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800";
+      icon = <SignalMedium className="w-3 h-3" />;
+      defaultLabel = "Cakap";
+      break;
+    case 2: // Dasar / Berkembang
+      colorClass = "bg-yellow-100 text-yellow-700 border-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-400 dark:border-yellow-800";
+      icon = <SignalLow className="w-3 h-3" />;
+      defaultLabel = "Dasar";
+      break;
+    case 1: // Intervensi
+      colorClass = "bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/30 dark:text-rose-400 dark:border-rose-800";
+      icon = <Info className="w-3 h-3" />;
+      defaultLabel = "Perlu Intervensi";
+      break;
+    default:
+      // Handle jika ada angka lain
+      defaultLabel = label || "Umum";
+      break;
   }
 
+  // Gunakan label dari Excel jika ada, jika tidak gunakan defaultLabel berdasarkan skor
+  const displayLabel = label || defaultLabel;
+
   return (
-    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${colorClass}`} title={label}>
-      {icon} {label}
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1.5 border ${colorClass} w-fit mt-1 shadow-sm`} title={`Level: ${score}`}>
+      {icon} {displayLabel}
     </span>
   );
 };
@@ -74,22 +94,18 @@ const ResultsSection: React.FC<ResultsSectionProps> = ({ groups }) => {
               <p className="text-indigo-100 text-xs">{group.members.length} Anggota</p>
             </div>
             <div className="p-4 flex-1">
-              <ul className="space-y-2">
+              <ul className="space-y-3">
                 {group.members.map((member, i) => (
-                  <li key={member.id} className="flex items-start gap-3 text-slate-700 dark:text-slate-300 text-sm border-b last:border-0 border-slate-50 dark:border-slate-700 pb-2 last:pb-0">
-                    <span className="font-mono text-slate-400 w-5 text-right flex-shrink-0 select-none">{i + 1}.</span>
+                  <li key={member.id} className="flex items-start gap-3 text-slate-700 dark:text-slate-300 text-sm border-b last:border-0 border-slate-50 dark:border-slate-700 pb-3 last:pb-0">
+                    <span className="font-mono text-slate-400 w-5 text-right flex-shrink-0 select-none pt-0.5">{i + 1}.</span>
                     <div className="flex flex-col w-full">
-                       <span className="font-medium flex items-center gap-2 flex-wrap">
-                        {member.name}
-                        {member.gender === 'M' && <span className="text-[10px] font-bold text-blue-500 bg-blue-100 dark:bg-blue-900/30 px-1.5 py-0.5 rounded">L</span>}
-                        {member.gender === 'F' && <span className="text-[10px] font-bold text-pink-500 bg-pink-100 dark:bg-pink-900/30 px-1.5 py-0.5 rounded">P</span>}
-                       </span>
-                       {/* Proficiency Badge below name or beside */}
-                       {member.proficiency && (
-                          <div className="mt-1">
-                            <ProficiencyBadge score={member.proficiency} label={member.proficiencyLabel} />
-                          </div>
-                       )}
+                       <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold">{member.name}</span>
+                        {member.gender === 'M' && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 px-1.5 py-0 rounded">L</span>}
+                        {member.gender === 'F' && <span className="text-[9px] font-bold text-pink-600 bg-pink-50 dark:bg-pink-900/30 border border-pink-100 dark:border-pink-800 px-1.5 py-0 rounded">P</span>}
+                       </div>
+                       {/* Proficiency Badge */}
+                       <ProficiencyBadge score={member.proficiency} label={member.proficiencyLabel} />
                     </div>
                   </li>
                 ))}

@@ -320,16 +320,6 @@ const QuestBoardGenerator: React.FC = () => {
           ))}
        </div>
 
-       {/* Footer Watermark */}
-       <div className="absolute bottom-12 left-0 w-full flex justify-center z-20 pointer-events-none">
-          <div 
-             className="inline-flex items-center gap-3 px-8 py-3 rounded-full bg-slate-900 text-white font-bold text-lg border-2 border-white/20 shadow-xl"
-             style={{ backgroundColor: '#0f172a' }}
-          >
-             <Map className="w-6 h-6 text-indigo-400" /> 
-             <span className="tracking-wide">KromaKeys Misi</span>
-          </div>
-       </div>
     </div>
   );
 
@@ -533,7 +523,7 @@ const QuestBoardGenerator: React.FC = () => {
                               </button>
                               <input 
                                 type="file" 
-                                ref={el => fileInputRefs.current[tier.id] = el}
+                                ref={(el) => { fileInputRefs.current[tier.id] = el; }}
                                 onChange={(e) => handleIconUpload(tier.id, e)}
                                 accept="image/png, image/jpeg"
                                 className="hidden"

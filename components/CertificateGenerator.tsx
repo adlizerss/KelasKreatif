@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { CertificateData, BulkCertificateData, CertificateGrade, CertificateThemeColor } from '../types';
 import { AWARD_AREAS, generateCertificateMessage } from '../utils/certificateHelpers';
 import { parseCertificateExcel, generateSampleCertificateExcel } from '../utils/fileParsers';
+import { robustSaveAs } from '../utils/exporters';
 import { Award, Crown, Star, ThumbsUp, Download, Printer, Users, FileSpreadsheet, CheckCircle, ChevronLeft, ChevronRight, Package, Palette, Check, Type, Sparkles, Share2, Copy } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -213,8 +214,12 @@ const CertificateGenerator: React.FC = () => {
     setPreviewIndex(prev => (prev < bulkData.length - 1 ? prev + 1 : prev));
   };
 
-  // --- EXPORT HELPER (Crucial for Layout Fix) ---
-  const captureHighQuality = async (element: HTMLElement): Promise<string> => {
+  // --- EXPORT HELPER (Crucial for Layout Fix & Optimization) ---
+  const captureHighQuality = async (
+      element: HTMLElement, 
+      mimeType: string = 'image/png', 
+      quality: number = 1.0
+  ): Promise<string> => {
     // 1. CLONE: Buat tiruan elemen untuk diexport
     // Ini penting agar tidak terpengaruh oleh CSS scale/transform di preview
     const clone = element.cloneNode(true) as HTMLElement;
@@ -235,8 +240,11 @@ const CertificateGenerator: React.FC = () => {
     try {
       await document.fonts.ready;
       // 3. CAPTURE: Foto elemen tiruan
+      // OPTIMIZATION: Reduced scale from 4 to 2.5. 
+      // 2.5 * 400 = 1000px width. This is sufficient for crisp digital viewing and A4 print.
+      // This reduces file size significantly.
       const canvas = await html2canvas(clone, { 
-        scale: 4, // Kualitas tinggi (1600x2560 px)
+        scale: 2.5, 
         useCORS: true,
         backgroundColor: null,
         logging: false,
@@ -245,7 +253,7 @@ const CertificateGenerator: React.FC = () => {
         windowWidth: 400,
         windowHeight: 640
       });
-      return canvas.toDataURL('image/png', 1.0);
+      return canvas.toDataURL(mimeType, quality);
     } catch (error) {
       console.error("Capture failed:", error);
       throw error;
@@ -257,7 +265,9 @@ const CertificateGenerator: React.FC = () => {
 
   // --- BULK PROCESSING LOGIC (Reused for PDF and ZIP) ---
   const processBulkItems = async (
-    onItemProcessed: (imgData: string, item: BulkCertificateData, index: number) => Promise<void>
+    onItemProcessed: (imgData: string, item: BulkCertificateData, index: number) => Promise<void>,
+    mimeType: string = 'image/png',
+    quality: number = 1.0
   ) => {
     if (bulkData.length === 0 || !certificateRef.current) return;
     
@@ -288,7 +298,7 @@ const CertificateGenerator: React.FC = () => {
 
         // 3. Capture Image using the Helper
         if (certificateRef.current) {
-            const imgData = await captureHighQuality(certificateRef.current);
+            const imgData = await captureHighQuality(certificateRef.current, mimeType, quality);
             // 4. Callback to handler (PDF adder or ZIP adder)
             await onItemProcessed(imgData, item, i);
         }
@@ -330,12 +340,14 @@ const CertificateGenerator: React.FC = () => {
       const x = (pageWidth - imgWidth) / 2;
       const y = (pageHeight - imgHeight) / 2;
 
+      // OPTIMIZATION: Use JPEG with 0.85 quality for PDF.
+      // This drastically reduces PDF size compared to PNG, especially for gradients.
       await processBulkItems(async (imgData, item, index) => {
         if (index > 0) pdf.addPage();
-        pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
-      });
+        pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
+      }, 'image/jpeg', 0.85);
 
-      pdf.save(`Bulk-Sertifikat-${new Date().toISOString().slice(0,10)}.pdf`);
+      pdf.save('KartuSertifikat-Batch.pdf');
     } catch (error) {
       alert("Gagal memproses PDF.");
     } finally {
@@ -351,18 +363,21 @@ const CertificateGenerator: React.FC = () => {
       const zip = new JSZip();
       const folder = zip.folder("Sertifikat_PNG");
 
+      // For ZIP, we use PNG to keep transparency and crisp text, 
+      // but the reduced Scale (2.5) in captureHighQuality will keep it light.
       await processBulkItems(async (imgData, item, index) => {
         // Remove "data:image/png;base64," header
-        const base64Data = imgData.replace(/^data:image\/(png|jpg);base64,/, "");
-        const fileName = `${index + 1}_${item.studentName.replace(/[^a-zA-Z0-9]/g, '_')}_${item.grade}.png`;
+        const base64Data = imgData.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
+        
+        // Clean Filename
+        const safeName = item.studentName.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
+        // Add index to avoid collisions if names are identical
+        const fileName = `KartuSertifikat-${safeName || 'Siswa'}-${index + 1}.png`;
         folder?.file(fileName, base64Data, { base64: true });
-      });
+      }, 'image/png', 1.0);
 
       const content = await zip.generateAsync({ type: "blob" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(content);
-      link.download = `Sertifikat-Bundle-${new Date().toISOString().slice(0,10)}.zip`;
-      link.click();
+      robustSaveAs(content, 'KartuSertifikat-Batch.zip');
 
     } catch (error) {
       console.error(error);
@@ -379,11 +394,19 @@ const CertificateGenerator: React.FC = () => {
     if (!certificateRef.current) return;
     setIsGenerating(true);
     try {
-      const image = await captureHighQuality(certificateRef.current);
-      const link = document.createElement("a");
-      link.href = image;
-      link.download = `Kartu-${data.studentName || 'Siswa'}-${data.grade}.png`;
-      link.click();
+      // PNG is safer for single image download (transparent background capable), 
+      // size reduced by scale 2.5
+      const image = await captureHighQuality(certificateRef.current, 'image/png');
+      
+      // Use robust method for WebView compatibility
+      const a = document.createElement("a");
+      a.href = image;
+      a.download = `KartuSertifikat-${data.studentName || 'Siswa'}.png`;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => document.body.removeChild(a), 100);
+
     } catch (err) {
       console.error(err);
       alert("Gagal mengunduh gambar.");
@@ -396,7 +419,8 @@ const CertificateGenerator: React.FC = () => {
     if (!certificateRef.current) return;
     setIsGenerating(true);
     try {
-      const imgData = await captureHighQuality(certificateRef.current);
+      // OPTIMIZATION: Use JPEG 0.85 for PDF embedding
+      const imgData = await captureHighQuality(certificateRef.current, 'image/jpeg', 0.85);
       
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -407,8 +431,8 @@ const CertificateGenerator: React.FC = () => {
       const x = (pageWidth - imgWidth) / 2;
       const y = (pageHeight - imgHeight) / 2;
 
-      pdf.addImage(imgData, 'PNG', x, y, imgWidth, imgHeight);
-      pdf.save(`Kartu-${data.studentName || 'Siswa'}-${data.grade}.pdf`);
+      pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
+      pdf.save(`KartuSertifikat-${data.studentName || 'Siswa'}.pdf`);
     } catch (err) {
       console.error(err);
       alert("Gagal mengunduh PDF.");
@@ -423,12 +447,12 @@ const CertificateGenerator: React.FC = () => {
     setIsGenerating(true);
     
     try {
-      // 1. Capture Image
-      const dataUrl = await captureHighQuality(certificateRef.current);
+      // 1. Capture Image (PNG is required for sharing usually)
+      const dataUrl = await captureHighQuality(certificateRef.current, 'image/png');
       
       // 2. Convert DataURL to Blob/File
       const blob = await (await fetch(dataUrl)).blob();
-      const file = new File([blob], `sertifikat-${data.studentName || 'siswa'}.png`, { type: 'image/png' });
+      const file = new File([blob], `KartuSertifikat-${data.studentName || 'siswa'}.png`, { type: 'image/png' });
 
       // 3. Try Native Sharing (Mobile)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
@@ -448,9 +472,11 @@ const CertificateGenerator: React.FC = () => {
           // Last Resort: Just download it
           const link = document.createElement("a");
           link.href = dataUrl;
-          link.download = `Kartu-${data.studentName || 'Siswa'}.png`;
+          link.download = `KartuSertifikat-${data.studentName || 'Siswa'}.png`;
+          document.body.appendChild(link);
           link.click();
-          alert("Browser ini tidak mendukung share otomatis. Gambar telah diunduh, silakan kirim manual ke WhatsApp.");
+          setTimeout(() => document.body.removeChild(link), 100);
+          alert("Perangkat ini tidak mendukung share otomatis. Gambar telah diunduh, silakan kirim manual ke WhatsApp.");
         }
       }
     } catch (err) {
@@ -712,7 +738,7 @@ const CertificateGenerator: React.FC = () => {
                       type="file" 
                       ref={fileInputRef}
                       onChange={handleBulkUpload}
-                      accept=".xlsx"
+                      accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                       className="block w-full text-sm text-slate-500 dark:text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 dark:file:bg-indigo-900/20 file:text-indigo-700 dark:file:text-indigo-300 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-900/40"
                     />
                     {bulkData.length > 0 && (
@@ -913,9 +939,10 @@ const CertificateGenerator: React.FC = () => {
                                  {data.studentClass || "Kelas"}
                               </p>
 
-                              {/* Award Area (Pill) */}
-                              <div className={`px-5 py-1.5 rounded-full ${themeStyle.iconBg} mb-4`}>
-                                 <h3 className={`text-xs font-bold uppercase tracking-wider ${themeStyle.text}`}>
+                              {/* Award Area (Pill) - FIXED ALIGNMENT FOR EXPORT */}
+                              {/* Removed background color and padding to prevent misalignment issues */}
+                              <div className="mb-4 flex justify-center items-center">
+                                 <h3 className={`text-sm font-bold uppercase tracking-widest ${themeStyle.text} leading-none mt-[1px]`}>
                                     {data.awardArea}
                                  </h3>
                               </div>
@@ -936,11 +963,10 @@ const CertificateGenerator: React.FC = () => {
                                  </div>
                                  
                                  {/* Teacher Section: Label TOP, Name BOTTOM */}
-                                 <div className="flex flex-col items-center w-48 relative pt-2">
+                                 <div className="flex flex-col items-center w-72 relative pt-2">
                                     <p className="text-[10px] uppercase font-bold text-slate-400 tracking-widest mb-2">Guru Kelas</p>
                                     <div className="w-full text-center">
                                        <p className="text-sm font-bold text-slate-800">{data.teacherName || "Nama Guru"}</p>
-                                       <div className="w-full h-0.5 bg-slate-800 mt-0.5"></div>
                                     </div>
                                  </div>
                               </div>

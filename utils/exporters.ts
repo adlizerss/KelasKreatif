@@ -1,10 +1,24 @@
 import { GroupResult } from '../types';
-import FileSaver from 'file-saver';
-import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
+import { Document, Packer, Paragraph, HeadingLevel, AlignmentType } from 'docx';
 
-// Handle potential ESM default export differences for file-saver
-// Some builds export the function as default, others as a property.
-const saveAs = (FileSaver as any).saveAs || FileSaver;
+// Helper function untuk download yang ramah Mobile/WebView
+// WebView sering gagal jika link tidak ada di dalam document body saat diklik
+export const robustSaveAs = (blob: Blob, filename: string) => {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.style.display = 'none';
+  a.href = url;
+  a.download = filename;
+  
+  document.body.appendChild(a);
+  a.click();
+  
+  // Cleanup
+  setTimeout(() => {
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  }, 100);
+};
 
 export const exportToTxt = (groups: GroupResult[]) => {
   let content = '';
@@ -17,7 +31,7 @@ export const exportToTxt = (groups: GroupResult[]) => {
   });
 
   const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  saveAs(blob, 'pembagian-kelompok.txt');
+  robustSaveAs(blob, 'pembagian-kelompok.txt');
 };
 
 export const exportToDocx = async (groups: GroupResult[]) => {
@@ -69,5 +83,5 @@ export const exportToDocx = async (groups: GroupResult[]) => {
   });
 
   const blob = await Packer.toBlob(doc);
-  saveAs(blob, 'pembagian-kelompok.docx');
+  robustSaveAs(blob, 'pembagian-kelompok.docx');
 };

@@ -1,5 +1,6 @@
 import * as XLSX from 'xlsx';
 import { Student, BulkCertificateData, CertificateGrade, CertificateThemeColor } from '../types';
+import { robustSaveAs } from './exporters';
 
 export interface ParsedStudent {
   name: string;
@@ -8,24 +9,66 @@ export interface ParsedStudent {
   proficiencyLabel?: string;
 }
 
-// Helper to map string to proficiency score
+// Helper to map string to proficiency score safely
 const mapProficiency = (input: string): { score: number, label: string } | undefined => {
   const normalized = input.trim().toUpperCase();
   
-  // Level 4: Mahir / Advanced
-  if (['MAHIR', 'ADVANCED', 'SANGAT BAIK', 'A', '4'].some(k => normalized.includes(k))) {
+  // Helper untuk mengecek kata utuh (Word Boundary check manual)
+  // Mencegah "DASAR" terdeteksi sebagai "A" karena mengandung huruf A
+  const hasWord = (word: string) => {
+     // Cek exact match
+     if (normalized === word) return true;
+     // Cek awal/akhir/tengah dengan spasi atau tanda baca umum
+     const regex = new RegExp(`(^|\\s|\\(|\\)|\\/|\\-)${word}($|\\s|\\(|\\)|\\/|\\-)`);
+     return regex.test(normalized);
+  };
+
+  // --- LEVEL 4: MAHIR / ADVANCED ---
+  if (
+    normalized.includes('MAHIR') || 
+    normalized.includes('ADVANCED') || 
+    normalized.includes('SANGAT BAIK') || 
+    hasWord('A') || 
+    hasWord('4')
+  ) {
     return { score: 4, label: 'Mahir' };
   }
-  // Level 3: Cakap / Proficient
-  if (['CAKAP', 'PROFICIENT', 'BAIK', 'B', '3'].some(k => normalized.includes(k))) {
+
+  // --- LEVEL 3: CAKAP / PROFICIENT ---
+  if (
+    normalized.includes('CAKAP') || 
+    normalized.includes('PROFICIENT') || 
+    (normalized.includes('BAIK') && !normalized.includes('SANGAT')) || // Hindari SANGAT BAIK
+    hasWord('B') || 
+    hasWord('3')
+  ) {
     return { score: 3, label: 'Cakap' };
   }
-  // Level 2: Berkembang / Developing
-  if (['BERKEMBANG', 'DEVELOPING', 'CUKUP', 'C', '2', 'DASAR', 'BASIC'].some(k => normalized.includes(k))) {
-    return { score: 2, label: 'Berkembang' };
+
+  // --- LEVEL 2: DASAR / BERKEMBANG ---
+  if (
+    normalized.includes('BERKEMBANG') || 
+    normalized.includes('DEVELOPING') || 
+    normalized.includes('CUKUP') || 
+    normalized.includes('DASAR') || 
+    normalized.includes('BASIC') ||
+    hasWord('C') || 
+    hasWord('2')
+  ) {
+    return { score: 2, label: 'Dasar' };
   }
-  // Level 1: Intervensi / Needs Support
-  if (['INTERVENSI', 'BUTUH', 'KURANG', 'D', '1', 'AWAL'].some(k => normalized.includes(k))) {
+
+  // --- LEVEL 1: INTERVENSI / PERLU BIMBINGAN ---
+  if (
+    normalized.includes('INTERVENSI') || 
+    normalized.includes('BUTUH') || 
+    normalized.includes('KURANG') || 
+    normalized.includes('AWAL') || 
+    normalized.includes('BIMBINGAN') ||
+    hasWord('D') || 
+    hasWord('E') || // Kadang E juga dipakai
+    hasWord('1')
+  ) {
     return { score: 1, label: 'Perlu Intervensi' };
   }
 
@@ -223,7 +266,11 @@ export const generateSampleCertificateExcel = () => {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Template Sertifikat");
-  XLSX.writeFile(wb, "Template_Sertifikat.xlsx");
+  
+  // Convert to binary array for Blob creation (Mobile Friendly)
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/octet-stream' });
+  robustSaveAs(blob, "Template_Sertifikat.xlsx");
 };
 
 export const generateStudentListTemplate = () => {
@@ -239,7 +286,11 @@ export const generateStudentListTemplate = () => {
 
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Daftar Siswa");
-  XLSX.writeFile(wb, "Template_Daftar_Siswa_Lengkap.xlsx");
+  
+  // Convert to binary array for Blob creation (Mobile Friendly)
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/octet-stream' });
+  robustSaveAs(blob, "Template_Daftar_Siswa_Lengkap.xlsx");
 };
 
 export const processRawNames = (inputs: (string | ParsedStudent)[]): Student[] => {
