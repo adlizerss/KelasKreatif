@@ -7,9 +7,10 @@ interface InputSectionProps {
   onStudentsLoaded: (students: Student[]) => void;
   currentCount: number;
   title?: string;
+  children?: React.ReactNode;
 }
 
-const InputSection: React.FC<InputSectionProps> = ({ onStudentsLoaded, currentCount, title }) => {
+const InputSection: React.FC<InputSectionProps> = ({ onStudentsLoaded, currentCount, title, children }) => {
   const [activeTab, setActiveTab] = useState<'manual' | 'file'>('manual');
   
   // State for simple manual input
@@ -236,6 +237,13 @@ const InputSection: React.FC<InputSectionProps> = ({ onStudentsLoaded, currentCo
                Catatan: Jika kolom gender atau kemampuan kosong, siswa akan dianggap umum/acak.
             </p>
           </div>
+        )}
+
+        {/* Render optional children (List Area) here */}
+        {children && (
+           <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-700 animate-in fade-in">
+             {children}
+           </div>
         )}
       </div>
     </div>

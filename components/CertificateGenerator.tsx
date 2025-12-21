@@ -3,7 +3,7 @@ import { CertificateData, BulkCertificateData, CertificateGrade, CertificateThem
 import { AWARD_AREAS, generateCertificateMessage } from '../utils/certificateHelpers';
 import { parseCertificateExcel, generateSampleCertificateExcel } from '../utils/fileParsers';
 import { robustSaveAs } from '../utils/exporters';
-import { Award, Crown, Star, ThumbsUp, Download, Printer, Users, FileSpreadsheet, CheckCircle, ChevronLeft, ChevronRight, Package, Palette, Check, Type, Sparkles, Share2, Copy } from 'lucide-react';
+import { Award, Crown, Star, ThumbsUp, Download, Printer, Users, FileSpreadsheet, CheckCircle, ChevronLeft, ChevronRight, Package, Palette, Check, Type, Sparkles, Share2, Copy, RotateCcw, Edit3 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import JSZip from 'jszip';
@@ -75,11 +75,7 @@ const COLOR_THEMES: Record<CertificateThemeColor, { gradient: string; text: stri
   },
 };
 
-const CertificateGenerator: React.FC = () => {
-  const [mode, setMode] = useState<'single' | 'bulk'>('single');
-  
-  // Single Mode State
-  const [data, setData] = useState<CertificateData>({
+const DEFAULT_SINGLE_DATA: CertificateData = {
     grade: 'B',
     themeColor: 'emerald',
     gradeDisplay: 'Baik',
@@ -90,7 +86,13 @@ const CertificateGenerator: React.FC = () => {
     teacherName: '',
     date: new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }),
     generatedMessage: '',
-  });
+};
+
+const CertificateGenerator: React.FC = () => {
+  const [mode, setMode] = useState<'single' | 'bulk'>('single');
+  
+  // Single Mode State
+  const [data, setData] = useState<CertificateData>(DEFAULT_SINGLE_DATA);
 
   // Bulk Mode State
   const [bulkData, setBulkData] = useState<BulkCertificateData[]>([]);
@@ -143,20 +145,24 @@ const CertificateGenerator: React.FC = () => {
         const availableWidth = containerWidth - 48; 
         
         // Card width is 400px.
-        // If container is smaller than card, scale down.
-        // If container is larger, keep scale 1 (or allow slight growth if needed, but 1 is crisp)
         const scale = Math.min(1, availableWidth / 400);
         setPreviewScale(scale);
       }
     };
-    
-    // Initial Call
     handleResize();
-    
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const handleReset = () => {
+    if (mode === 'single') {
+        setData(DEFAULT_SINGLE_DATA);
+    } else {
+        setBulkData([]);
+        setPreviewIndex(0);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   const handleChange = (field: keyof CertificateData, value: string) => {
     setData(prev => ({ ...prev, [field]: value }));
@@ -184,7 +190,6 @@ const CertificateGenerator: React.FC = () => {
   };
 
   // --- BULK HANDLERS ---
-
   const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -196,8 +201,7 @@ const CertificateGenerator: React.FC = () => {
         return;
       }
       setBulkData(parsedData);
-      setPreviewIndex(0); // Reset to first
-      
+      setPreviewIndex(0); 
     } catch (error) {
       console.error(error);
       alert("Gagal membaca file Excel. Pastikan format sesuai template.");
@@ -214,24 +218,19 @@ const CertificateGenerator: React.FC = () => {
     setPreviewIndex(prev => (prev < bulkData.length - 1 ? prev + 1 : prev));
   };
 
-  // --- EXPORT HELPER (Crucial for Layout Fix & Optimization) ---
+  // --- EXPORT HELPER ---
   const captureHighQuality = async (
       element: HTMLElement, 
       mimeType: string = 'image/png', 
       quality: number = 1.0
   ): Promise<string> => {
-    // 1. CLONE: Buat tiruan elemen untuk diexport
-    // Ini penting agar tidak terpengaruh oleh CSS scale/transform di preview
     const clone = element.cloneNode(true) as HTMLElement;
-
-    // 2. STYLE: Reset transform dan posisikan di luar layar
     clone.style.transform = 'none';
     clone.style.margin = '0';
     clone.style.position = 'fixed';
     clone.style.top = '-10000px';
     clone.style.left = '-10000px';
     clone.style.zIndex = '-9999';
-    // Paksa ukuran agar presisi sesuai desain
     clone.style.width = '400px'; 
     clone.style.height = '640px';
 
@@ -239,10 +238,6 @@ const CertificateGenerator: React.FC = () => {
 
     try {
       await document.fonts.ready;
-      // 3. CAPTURE: Foto elemen tiruan
-      // OPTIMIZATION: Reduced scale from 4 to 2.5. 
-      // 2.5 * 400 = 1000px width. This is sufficient for crisp digital viewing and A4 print.
-      // This reduces file size significantly.
       const canvas = await html2canvas(clone, { 
         scale: 2.5, 
         useCORS: true,
@@ -258,28 +253,21 @@ const CertificateGenerator: React.FC = () => {
       console.error("Capture failed:", error);
       throw error;
     } finally {
-      // 4. CLEANUP: Hapus tiruan
       document.body.removeChild(clone);
     }
   };
 
-  // --- BULK PROCESSING LOGIC (Reused for PDF and ZIP) ---
+  // --- BULK PROCESSING LOGIC ---
   const processBulkItems = async (
     onItemProcessed: (imgData: string, item: BulkCertificateData, index: number) => Promise<void>,
     mimeType: string = 'image/png',
     quality: number = 1.0
   ) => {
     if (bulkData.length === 0 || !certificateRef.current) return;
-    
-    // Simpan index saat ini untuk dikembalikan nanti
     const originalIndex = previewIndex;
-    
     try {
-      // Loop through all students
       for (let i = 0; i < bulkData.length; i++) {
         const item = bulkData[i];
-        
-        // 1. Update State to Render UI (Manual override of preview logic)
         setData(prev => ({
           ...prev,
           grade: item.grade,
@@ -292,27 +280,18 @@ const CertificateGenerator: React.FC = () => {
           teacherName: item.teacherName || prev.teacherName,
           date: item.date || prev.date,
         }));
-
-        // 2. WAIT for React to Render the DOM
         await new Promise(resolve => setTimeout(resolve, 150));
-
-        // 3. Capture Image using the Helper
         if (certificateRef.current) {
             const imgData = await captureHighQuality(certificateRef.current, mimeType, quality);
-            // 4. Callback to handler (PDF adder or ZIP adder)
             await onItemProcessed(imgData, item, i);
         }
-
-        // Update Progress
         setBulkProgress(prev => ({ ...prev, current: i + 1 }));
       }
     } catch (error) {
       console.error(error);
       throw error;
     } finally {
-      // Restore view to original index or 0
       setPreviewIndex(originalIndex);
-      // Force refresh preview data
       const item = bulkData[originalIndex];
       if (item) {
         setData(prev => ({
@@ -329,19 +308,15 @@ const CertificateGenerator: React.FC = () => {
   const processBulkPDF = async () => {
     setIsProcessingBulk(true);
     setBulkProgress({ current: 0, total: bulkData.length, type: 'PDF' });
-
     try {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      
       const imgWidth = 100; 
       const imgHeight = 160; 
       const x = (pageWidth - imgWidth) / 2;
       const y = (pageHeight - imgHeight) / 2;
 
-      // OPTIMIZATION: Use JPEG with 0.85 quality for PDF.
-      // This drastically reduces PDF size compared to PNG, especially for gradients.
       await processBulkItems(async (imgData, item, index) => {
         if (index > 0) pdf.addPage();
         pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
@@ -358,27 +333,17 @@ const CertificateGenerator: React.FC = () => {
   const processBulkZIP = async () => {
     setIsProcessingBulk(true);
     setBulkProgress({ current: 0, total: bulkData.length, type: 'ZIP' });
-
     try {
       const zip = new JSZip();
       const folder = zip.folder("Sertifikat_PNG");
-
-      // For ZIP, we use PNG to keep transparency and crisp text, 
-      // but the reduced Scale (2.5) in captureHighQuality will keep it light.
       await processBulkItems(async (imgData, item, index) => {
-        // Remove "data:image/png;base64," header
         const base64Data = imgData.replace(/^data:image\/(png|jpg|jpeg);base64,/, "");
-        
-        // Clean Filename
         const safeName = item.studentName.replace(/[^a-zA-Z0-9 ]/g, '_').trim();
-        // Add index to avoid collisions if names are identical
         const fileName = `KartuSertifikat-${safeName || 'Siswa'}-${index + 1}.png`;
         folder?.file(fileName, base64Data, { base64: true });
       }, 'image/png', 1.0);
-
       const content = await zip.generateAsync({ type: "blob" });
       robustSaveAs(content, 'KartuSertifikat-Batch.zip');
-
     } catch (error) {
       console.error(error);
       alert("Gagal memproses ZIP.");
@@ -387,18 +352,12 @@ const CertificateGenerator: React.FC = () => {
     }
   };
 
-
   // --- SINGLE DOWNLOAD HANDLERS ---
-
   const handleDownloadImage = async () => {
     if (!certificateRef.current) return;
     setIsGenerating(true);
     try {
-      // PNG is safer for single image download (transparent background capable), 
-      // size reduced by scale 2.5
       const image = await captureHighQuality(certificateRef.current, 'image/png');
-      
-      // Use robust method for WebView compatibility
       const a = document.createElement("a");
       a.href = image;
       a.download = `KartuSertifikat-${data.studentName || 'Siswa'}.png`;
@@ -406,7 +365,6 @@ const CertificateGenerator: React.FC = () => {
       document.body.appendChild(a);
       a.click();
       setTimeout(() => document.body.removeChild(a), 100);
-
     } catch (err) {
       console.error(err);
       alert("Gagal mengunduh gambar.");
@@ -419,18 +377,14 @@ const CertificateGenerator: React.FC = () => {
     if (!certificateRef.current) return;
     setIsGenerating(true);
     try {
-      // OPTIMIZATION: Use JPEG 0.85 for PDF embedding
       const imgData = await captureHighQuality(certificateRef.current, 'image/jpeg', 0.85);
-      
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      
       const imgWidth = 100; 
       const imgHeight = 160; 
       const x = (pageWidth - imgWidth) / 2;
       const y = (pageHeight - imgHeight) / 2;
-
       pdf.addImage(imgData, 'JPEG', x, y, imgWidth, imgHeight);
       pdf.save(`KartuSertifikat-${data.studentName || 'Siswa'}.pdf`);
     } catch (err) {
@@ -441,20 +395,13 @@ const CertificateGenerator: React.FC = () => {
     }
   };
 
-  // --- SHARE HANDLER ---
   const handleShareToWhatsApp = async () => {
     if (!certificateRef.current) return;
     setIsGenerating(true);
-    
     try {
-      // 1. Capture Image (PNG is required for sharing usually)
       const dataUrl = await captureHighQuality(certificateRef.current, 'image/png');
-      
-      // 2. Convert DataURL to Blob/File
       const blob = await (await fetch(dataUrl)).blob();
       const file = new File([blob], `KartuSertifikat-${data.studentName || 'siswa'}.png`, { type: 'image/png' });
-
-      // 3. Try Native Sharing (Mobile)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
@@ -462,14 +409,11 @@ const CertificateGenerator: React.FC = () => {
           text: `Selamat kepada ${data.studentName} atas pencapaiannya!`,
         });
       } else {
-        // 4. Fallback for Desktop (Clipboard)
         try {
           const clipboardItem = new ClipboardItem({ 'image/png': blob });
           await navigator.clipboard.write([clipboardItem]);
           alert("Gambar telah disalin ke Clipboard! \n\nSilakan buka WhatsApp Web dan tekan Paste (Ctrl+V) di chat.");
         } catch (clipErr) {
-          console.error("Clipboard failed", clipErr);
-          // Last Resort: Just download it
           const link = document.createElement("a");
           link.href = dataUrl;
           link.download = `KartuSertifikat-${data.studentName || 'Siswa'}.png`;
@@ -487,7 +431,6 @@ const CertificateGenerator: React.FC = () => {
     }
   };
 
-  // --- GRADE & THEME LOGIC ---
   const currentGradeConfig = {
     B: { icon: ThumbsUp, label: 'Certificate of Excellence' },
     A: { icon: Star, label: 'Certificate of Achievement' },
@@ -496,9 +439,15 @@ const CertificateGenerator: React.FC = () => {
 
   const themeStyle = COLOR_THEMES[data.themeColor];
   const ThemeIcon = currentGradeConfig.icon;
-
-  // Constants for fixed layout
-  // Note: We are using a 400x640px base for the card
+  
+  // Logic to show reset button
+  const showReset = mode === 'single' 
+    ? (data.studentName || data.studentClass || data.specificQuote || data.teacherName) 
+    : (bulkData.length > 0);
+  
+  // Detect if current award area is custom (not in standard list, or explicitly "Lainnya")
+  const standardOptions = AWARD_AREAS.filter(a => a !== 'Lainnya');
+  const isCustomAward = !standardOptions.includes(data.awardArea);
 
   return (
     <div className="animate-in fade-in duration-500 pb-10">
@@ -534,11 +483,19 @@ const CertificateGenerator: React.FC = () => {
           </div>
 
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden transition-colors">
-            <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 flex items-center justify-between">
                <h3 className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                  {mode === 'single' ? <Award className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> : <FileSpreadsheet className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />}
                  {mode === 'single' ? '1. Data Penghargaan' : '1. Upload Data Massal'}
                </h3>
+               {showReset && (
+                   <button 
+                     onClick={handleReset} 
+                     className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded transition-colors"
+                   >
+                     <RotateCcw className="w-3 h-3" /> Reset
+                   </button>
+               )}
             </div>
             
             <div className="p-6 space-y-4">
@@ -652,15 +609,43 @@ const CertificateGenerator: React.FC = () => {
                   <div className="space-y-3 pt-2 border-t border-slate-100 dark:border-slate-700">
                     <div>
                       <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Area Penghargaan</label>
-                      <select 
-                        value={data.awardArea}
-                        onChange={(e) => handleChange('awardArea', e.target.value)}
-                        className="w-full mt-1 p-2 border border-slate-300 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors"
-                      >
-                        {AWARD_AREAS.map(area => (
-                          <option key={area} value={area}>{area}</option>
-                        ))}
-                      </select>
+                      <div className="space-y-2 mt-1">
+                         <select 
+                            value={isCustomAward ? 'Lainnya' : data.awardArea}
+                            onChange={(e) => {
+                               const val = e.target.value;
+                               if (val === 'Lainnya') {
+                                  // Switch to custom mode, clear value to prompt typing
+                                  handleChange('awardArea', '');
+                               } else {
+                                  handleChange('awardArea', val);
+                               }
+                            }}
+                            className="w-full p-2 border border-slate-300 dark:border-slate-600 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors"
+                         >
+                            {standardOptions.map(area => (
+                              <option key={area} value={area}>{area}</option>
+                            ))}
+                            <option value="Lainnya">Kustom / Lainnya...</option>
+                         </select>
+
+                         {/* Custom Input Field - Only shows if 'Lainnya' is selected or custom value exists */}
+                         {isCustomAward && (
+                           <div className="animate-in fade-in slide-in-from-top-1">
+                              <div className="relative">
+                                 <Edit3 className="absolute left-3 top-2.5 w-4 h-4 text-indigo-500" />
+                                 <input 
+                                   type="text"
+                                   value={data.awardArea === 'Lainnya' ? '' : data.awardArea}
+                                   onChange={(e) => handleChange('awardArea', e.target.value)}
+                                   placeholder="Ketik judul penghargaan..."
+                                   autoFocus
+                                   className="w-full pl-9 p-2 border border-indigo-300 dark:border-indigo-700 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-indigo-50 dark:bg-indigo-900/10 text-slate-900 dark:text-slate-100 transition-colors text-sm"
+                                 />
+                              </div>
+                           </div>
+                         )}
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase">Kutipan / Alasan Spesifik</label>

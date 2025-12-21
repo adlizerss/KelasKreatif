@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="id">
+<html lang="id" class="h-full bg-slate-50 dark:bg-slate-950 antialiased">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -33,6 +33,17 @@
       .font-display {
         font-family: 'Outfit', sans-serif;
       }
+      /* Ensure full height to prevent background issues */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #root {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+      }
     </style>
   <script type="importmap">
 {
@@ -52,7 +63,7 @@
 }
 </script>
 </head>
-  <body class="bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-    <div id="root"></div>
+  <body class="h-full bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300 pb-12">
+    <div id="root" class="min-h-full"></div>
   </body>
 </html>

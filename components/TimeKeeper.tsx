@@ -261,6 +261,16 @@ const TimeKeeper: React.FC = () => {
     setShowNotification(null);
   };
 
+  const handleFullReset = () => {
+    setConfig([
+        { id: 'opening', label: 'Pembuka', durationMinutes: 10, color: 'text-blue-600 dark:text-blue-400' },
+        { id: 'core', label: 'Kegiatan Inti', durationMinutes: 40, color: 'text-emerald-600 dark:text-emerald-400' },
+        { id: 'closing', label: 'Penutup', durationMinutes: 10, color: 'text-orange-600 dark:text-orange-400' },
+    ]);
+    setTotalTimeInput(60);
+    resetTimer();
+  };
+
   const skipSegment = () => {
     stopAlarmAndProceed();
   };
@@ -441,6 +451,12 @@ const TimeKeeper: React.FC = () => {
                             <span className="text-xs text-slate-500">mnt</span>
                         </div>
                      )}
+                     <button 
+                        onClick={handleFullReset}
+                        className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded transition-colors"
+                     >
+                        <RotateCcw className="w-3 h-3" /> Reset Default
+                     </button>
                    </div>
                 </div>
 
