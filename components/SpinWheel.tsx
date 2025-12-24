@@ -241,12 +241,12 @@ const SpinWheel: React.FC = () => {
 
   return (
     <div className="animate-in fade-in duration-500 pb-40 relative">
-      <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[60]" />
+      <canvas ref={canvasRef} className="fixed inset-0 pointer-events-none z-[70]" />
 
       {/* WINNER MODAL */}
       <AnimatePresence>
         {winner && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
              <motion.div 
                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"

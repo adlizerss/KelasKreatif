@@ -1,6 +1,6 @@
 {
-  "name": "KromaKeys",
-  "short_name": "KromaKeys",
+  "name": "EduKeys - Alat Bantu Guru",
+  "short_name": "EduKeys",
   "description": "Alat Bantu Guru: Pengacak Kelompok, Sertifikat, dan Timer",
   "start_url": ".",
   "display": "standalone",
