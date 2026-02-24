@@ -1,1 +1,103 @@
+<!DOCTYPE html>
+<html lang="id" class="h-full antialiased">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>EduTools - Alat Bantu Guru</title>
+    
+    <!-- Favicon & App Icon Setup -->
+    <link rel="icon" type="image/svg+xml" href="logo.svg" />
+    <link rel="apple-touch-icon" href="logo.svg" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="theme-color" content="#ffffff" />
 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              display: ['Outfit', 'sans-serif'],
+            },
+            colors: {
+              glass: {
+                100: 'rgba(255, 255, 255, 0.1)',
+                200: 'rgba(255, 255, 255, 0.2)',
+                300: 'rgba(255, 255, 255, 0.3)',
+                400: 'rgba(255, 255, 255, 0.4)',
+                500: 'rgba(255, 255, 255, 0.5)',
+                800: 'rgba(255, 255, 255, 0.8)',
+              }
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: transparent; /* Changed from #f8fafc to transparent */
+      }
+      .font-display {
+        font-family: 'Outfit', sans-serif;
+      }
+      /* Hide scrollbar for clean UI but allow scroll */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+      /* Custom Glass Utils */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      .dark .glass-panel {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      /* GLOBAL SMOOTH COLOR TRANSITION */
+      /* Applies to common elements to ensure Dark/Light mode switch feels fluid */
+      body, div, nav, button, input, textarea, select, span, p, h1, h2, h3, h4, h5, h6, svg, path, rect, circle, section, main, article {
+        transition-property: background-color, border-color, color, fill, stroke, shadow, box-shadow, opacity;
+        transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); /* Standard Ease-in-out */
+        transition-duration: 500ms; /* 0.5s duration for smoothness */
+      }
+      
+      /* Exclude transform/layout properties to prevent jankiness during layout shifts */
+      .no-color-transition {
+        transition: none !important;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "file-saver": "https://aistudiocdn.com/file-saver@^2.0.5",
+    "react/": "https://aistudiocdn.com/react@^19.2.1/",
+    "react": "https://aistudiocdn.com/react@^19.2.1",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.556.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
+    "framer-motion": "https://aistudiocdn.com/framer-motion@^12.23.25",
+    "xlsx": "https://aistudiocdn.com/xlsx@^0.18.5",
+    "docx": "https://aistudiocdn.com/docx@^9.5.1",
+    "html2canvas": "https://aistudiocdn.com/html2canvas@^1.4.1",
+    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1",
+    "jszip": "https://aistudiocdn.com/jszip@^3.10.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="h-full text-slate-900 dark:text-slate-100 transition-colors duration-500 overflow-x-hidden selection:bg-indigo-500 selection:text-white bg-slate-50 dark:bg-slate-950">
+    <div id="root" class="min-h-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
