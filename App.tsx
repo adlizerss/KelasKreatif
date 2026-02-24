@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Disc, Award, Sun, Moon, Clock, Map, LogOut } from 'lucide-react';
+import { Users, Disc, Award, Sun, Moon, Clock, Gamepad2, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GroupGenerator from './components/GroupGenerator';
 import SpinWheel from './components/SpinWheel';
 import CertificateGenerator from './components/CertificateGenerator';
 import TimeKeeper from './components/TimeKeeper';
-import QuestBoardGenerator from './components/QuestBoardGenerator';
+import IceBreaker from './components/IceBreaker';
 
-type AppMode = 'grouper' | 'wheel' | 'certificate' | 'timekeeper' | 'quest';
+type AppMode = 'grouper' | 'wheel' | 'certificate' | 'timekeeper' | 'icebreaker';
 type Theme = 'light' | 'dark';
 
 // --- THEME CONFIGURATION ---
@@ -81,9 +81,9 @@ const THEMES: Record<AppMode, {
     headerBorderClass: 'border-orange-500/50',
     headerShadowClass: 'shadow-orange-900/20'
   },
-  quest: {
-    label: 'Misi',
-    icon: Map,
+  icebreaker: {
+    label: 'Penyegar',
+    icon: Gamepad2,
     bgGradient: 'from-purple-100 via-violet-50 to-white dark:from-slate-950 dark:via-purple-950/40 dark:to-slate-950',
     blob1: 'bg-purple-500',
     blob2: 'bg-violet-500',
@@ -382,7 +382,7 @@ function App() {
                     {mode === 'wheel' && <SpinWheel />}
                     {mode === 'certificate' && <CertificateGenerator />}
                     {mode === 'timekeeper' && <TimeKeeper />}
-                    {mode === 'quest' && <QuestBoardGenerator />}
+                    {mode === 'icebreaker' && <IceBreaker />}
                  </motion.div>
               </AnimatePresence>
            </div>
