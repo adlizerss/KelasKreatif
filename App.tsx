@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Disc, Award, Sun, Moon, Clock, Gamepad2, LogOut } from 'lucide-react';
+import { Users, Dices, Award, Sun, Moon, Clock, Gamepad2, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import GroupGenerator from './components/GroupGenerator';
-import SpinWheel from './components/SpinWheel';
+import Randomizer from './components/Randomizer';
 import CertificateGenerator from './components/CertificateGenerator';
 import TimeKeeper from './components/TimeKeeper';
 import IceBreaker from './components/IceBreaker';
@@ -40,8 +40,8 @@ const THEMES: Record<AppMode, {
     headerShadowClass: 'shadow-blue-900/20'
   },
   wheel: {
-    label: 'Roda',
-    icon: Disc,
+    label: 'Acak',
+    icon: Dices,
     bgGradient: 'from-rose-100 via-pink-50 to-white dark:from-slate-950 dark:via-rose-950/40 dark:to-slate-950',
     blob1: 'bg-rose-500',
     blob2: 'bg-pink-500',
@@ -379,7 +379,7 @@ function App() {
                     transition={{ duration: 0.3 }}
                  >
                     {mode === 'grouper' && <GroupGenerator themeColor={activeTheme.colorTheme} />}
-                    {mode === 'wheel' && <SpinWheel />}
+                    {mode === 'wheel' && <Randomizer />}
                     {mode === 'certificate' && <CertificateGenerator />}
                     {mode === 'timekeeper' && <TimeKeeper />}
                     {mode === 'icebreaker' && <IceBreaker />}
